@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1020"><title>BO1Z · iPad A16 test</title>
+<style>:root{font-family:system-ui,-apple-system,sans-serif;color:#f6f7fb;background:#0b1020}*{box-sizing:border-box}body{margin:0;padding:24px;max-width:760px;margin:auto}h1{font-size:clamp(28px,6vw,48px);letter-spacing:-1.5px}p{color:#bbc4d6;line-height:1.5}.pill{display:inline-block;border:1px solid #34405b;border-radius:100px;padding:7px 12px;color:#bcc8e5}.card{border:1px solid #2a3854;background:#141d31;border-radius:16px;padding:18px;margin:12px 0}.item{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #2a3854;padding:13px 0}.item:last-child{border:0}.yes{color:#80ecbd}.no{color:#ff948f}.warn{color:#ffcd7c}button{border:0;border-radius:12px;background:#bfd0ff;color:#071027;padding:14px 20px;font-weight:700;font-size:16px;cursor:pointer;margin:12px 12px 12px 0}small{color:#9aabc8}code{word-break:break-all}</style></head>
+<body><span class="pill">BO1Z • iPad A16 • technický test v1.1</span><h1>Diagnostika kompatibility</h1><p>Tato stránka testuje možnosti Safari na iPadu. <strong>Není to hratelná kopie BO1 Zombies.</strong> Výsledky nám pomůžou zjistit, zda vůbec může původní engine běžet na iPadOS.</p><section class="card"><div id="results">Test probíhá…</div></section><button id="copy">Kopírovat výsledky</button><button id="retry">Spustit znovu</button><p id="feedback" aria-live="polite"></p><small>GitHub Pages standardně neposílá vlastní hlavičky COOP/COEP. Bez nich zpravidla nebude dostupná cross-origin izolace a SharedArrayBuffer. Tato stránka nic neposílá na server.</small>
+<script>
+let output="";
+function row(name,good,details,level){let status=good?"OK":level==="warn"?"POZOR":"NE";return '<div class="item"><span>'+name+'<br><small>'+details+'</small></span><strong class="'+(good?"yes":level==="warn"?"warn":"no")+'">'+status+'</strong></div>'}
+function test(){let html="",notes=[];function add(n,b,d,l){html+=row(n,b,d,l);notes.push(n+": "+(b?"OK":l==="warn"?"POZOR":"NE")+" — "+d)}
+add("Dotykové ovládání",navigator.maxTouchPoints>0,"maxTouchPoints: "+navigator.maxTouchPoints);
+add("WebAssembly",typeof WebAssembly==="object","WebAssembly API");
+add("WASM JSPI",!!(window.WebAssembly&&WebAssembly.Suspending&&WebAssembly.promising),"Suspending/promising");
+add("SharedArrayBuffer",typeof SharedArrayBuffer==="function","Vyžaduje bezpečnostní izolaci stránky");
+add("Cross-origin isolation",window.crossOriginIsolated===true,"crossOriginIsolated: "+window.crossOriginIsolated);
+add("WASM Threads",typeof SharedArrayBuffer==="function"&&typeof Atomics==="object","Sdílená paměť + Atomics");
+let canvas=document.createElement("canvas"),gl=null;try{gl=canvas.getContext("webgl2")}catch(e){}add("WebGL2",!!gl,gl?"WebGL2 dostupné":"Kontext nevytvořen");if(gl){let ext=["EXT_color_buffer_float","OES_texture_float_linear","EXT_disjoint_timer_query_webgl2"];for(let x of ext)add(x,!!gl.getExtension(x),"Grafické rozšíření","warn");}
+add("WebGPU",!!navigator.gpu,"navigator.gpu","warn");add("Pointer Lock",!!(document.body.requestPointerLock),"Ovládání kurzoru; přítomnost API nezaručuje použití","warn");
+add("Gamepad API",!!navigator.getGamepads,"Bluetooth ovladač může fungovat","warn");
+document.getElementById("results").innerHTML=html;output=["BO1Z iPad Test v1.1","Čas: "+new Date().toISOString(),"User agent: "+navigator.userAgent,"Platform: "+navigator.platform,...notes].join("\n")}
+document.getElementById("retry").onclick=test;document.getElementById("copy").onclick=async()=>{try{await navigator.clipboard.writeText(output);document.getElementById("feedback").textContent="Zkopírováno. Pošli výsledky do chatu."}catch(e){document.getElementById("feedback").textContent=output}};test();
+</script></body></html>
