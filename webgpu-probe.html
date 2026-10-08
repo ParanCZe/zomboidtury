@@ -1,0 +1,27 @@
+<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0c1425"><title>BO1Z Rebuild 1.8 – WebGPU async probe</title><style>*{box-sizing:border-box}body{margin:0;background:#0b1120;color:#f1f5ff;font:16px/1.55 system-ui,-apple-system,sans-serif}main{max-width:800px;margin:auto;padding:25px 18px 80px}h1{font-size:clamp(30px,6vw,44px);line-height:1.14;margin:10px 0}p{color:#bccae3}section{background:#18243b;border:1px solid #34445f;padding:18px;border-radius:15px;margin:17px 0}button{background:#b8ccff;border:0;border-radius:11px;font:700 16px system-ui;color:#09162e;padding:13px 16px;margin:5px 9px 5px 0}button:disabled{opacity:.5}pre{font:12px/1.6 monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#081222;padding:14px;border-radius:9px}canvas{border:1px solid #586b8b;width:100%;max-width:512px;aspect-ratio:16/9;background:#080c14}small{color:#9eadcc}</style></head><body><main><small>ORIGINAL ENGINE / CESTA A / v1.8</small><h1>WebGPU bez JSPI</h1><p>Z dodaného <code>KisakBlack-web.mjs</code> jsme identifikovali dvě asynchronní JSPI vazby: <code>__asyncjs__InitializeWebGPU</code> a <code>__asyncjs__ReadWebGPUPixelsJS</code>. Tento experiment testuje podobné operace přes běžné JavaScriptové <code>async/await</code>. Nepouští původní WASM a nedokazuje, že lze JSPI z herního runtime odstranit.</p><section><button id="run">Spustit GPU experiment</button><button id="copy">Kopírovat výsledek</button><p id="status">Připraveno.</p><canvas id="surface" width="512" height="288"></canvas></section><section><h2>Protokol</h2><pre id="log">—</pre></section><section><h2>Jak vyhodnotíme test?</h2><p>Ověříme dostupnost WebGPU adaptéru a zařízení, vykreslení jednoho snímku, přenos pixelů z GPU zpět do JavaScriptu a dostupnost BC komprese. Tato grafická sonda je oddělená od skutečné inicializace enginu a neřeší jeho WASM JSPI, vlákna ani mapy.</p></section></main><script>
+const btn=document.querySelector('#run'),status=document.querySelector('#status'),log=document.querySelector('#log'),canvas=document.querySelector('#surface');let lines=[];function add(s){lines.push(s);log.textContent=lines.join('\n')}
+btn.onclick=async()=>{lines=[];btn.disabled=true;add('BO1Z v1.8 WebGPU async experiment');add('UA: '+navigator.userAgent);add('JSPI: '+Boolean(WebAssembly?.Suspending&&WebAssembly?.promising));add('crossOriginIsolated: '+crossOriginIsolated);let device;
+try{
+ if(!navigator.gpu)throw Error('navigator.gpu unavailable');
+ let t=performance.now();const adapter=await navigator.gpu.requestAdapter();
+ if(!adapter)throw Error('requestAdapter() returned null');add('ADAPTER: OK ('+Math.round(performance.now()-t)+'ms)');
+ const bc=adapter.features.has('texture-compression-bc');add('BC TEXTURE COMPRESSION: '+(bc?'YES':'NO'));
+ const features=[];for(const x of ['depth32float-stencil8','float32-filterable','float32-blendable'])if(adapter.features.has(x))features.push(x);
+ t=performance.now();device=await adapter.requestDevice({requiredFeatures:features});add('ASYNC GPU DEVICE: OK ('+Math.round(performance.now()-t)+'ms), optional features: '+features.join(', '));
+ const context=canvas.getContext('webgpu');if(!context)throw Error('canvas.getContext(webgpu) unavailable');
+ const fmt=navigator.gpu.getPreferredCanvasFormat();
+ context.configure({device,format:fmt,alphaMode:'opaque',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});add('CANVAS CONTEXT: OK ('+fmt+')');
+ const shader=device.createShaderModule({code:`@vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f { var a=array<vec2f,3>(vec2f(-.8,-.7),vec2f(.8,-.7),vec2f(0.,.8));return vec4f(a[i],0,1); } @fragment fn fs()->@location(0) vec4f { return vec4f(0.16,0.82,0.59,1.); }`});
+ const pipeline=await device.createRenderPipelineAsync({layout:'auto',vertex:{module:shader,entryPoint:'vs'},fragment:{module:shader,entryPoint:'fs',targets:[{format:fmt}]}});
+ const texture=context.getCurrentTexture(),encoder=device.createCommandEncoder();
+ const pass=encoder.beginRenderPass({colorAttachments:[{view:texture.createView(),clearValue:{r:.03,g:.07,b:.13,a:1},loadOp:'clear',storeOp:'store'}]});
+ pass.setPipeline(pipeline);pass.draw(3);pass.end();add('RENDER TRIANGLE: OK');
+ const stride=256,buffer=device.createBuffer({size:stride,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ encoder.copyTextureToBuffer({texture,origin:{x:canvas.width>>1,y:canvas.height>>1,z:0}},{buffer,bytesPerRow:stride,rowsPerImage:1},{width:1,height:1,depthOrArrayLayers:1});
+ device.queue.submit([encoder.finish()]);
+ t=performance.now();await buffer.mapAsync(GPUMapMode.READ);const pixel=Array.from(new Uint8Array(buffer.getMappedRange()).slice(0,4));buffer.unmap();buffer.destroy();
+ add('ASYNC GPU READBACK: OK ('+Math.round(performance.now()-t)+'ms), centerPixel='+pixel.join(','));add('RESULT: WebGPU asynchronous init and readback work in ordinary JavaScript (NOT original WASM runtime).');status.textContent='Hotovo, zkopíruj výsledek.';
+}catch(e){add('ERROR: '+(e?.name||'Error')+': '+(e?.message||String(e)));status.textContent='Experiment selhal, pošli protokol.'}finally{btn.disabled=false}
+};
+document.querySelector('#copy').onclick=async()=>{try{await navigator.clipboard.writeText(lines.join('\n'));status.textContent='Zkopírováno.'}catch(e){status.textContent='Kopírování se nezdařilo, označ protokol ručně.'}};
+</script></body></html>
