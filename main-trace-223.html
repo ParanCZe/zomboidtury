@@ -1,0 +1,30 @@
+<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BO1Z v2.2.3 — Main trace</title><style>body{background:#0b1120;color:#edf4ff;font:15px/1.5 system-ui;margin:0}main{max-width:760px;margin:auto;padding:26px 17px}h1{font-size:34px}p{color:#bbcae1}.card{background:#18263c;border:1px solid #344661;border-radius:16px;padding:18px;margin:15px 0}label{display:block;margin:12px 0}button{border:0;border-radius:11px;background:#bed1ff;color:#08152d;padding:12px 17px;font-weight:bold;margin:5px}button:disabled{opacity:.4}pre{font:12px/1.65 monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#071423;padding:12px;border-radius:10px}</style></head><body><main><small>CESTA A · ORIGINAL ENGINE · v2.2.3</small><h1>Trasování herního MAIN</h1><p>Ověříme, zda originální Emscripten runtime opravdu zavolá <code>callMain</code> a jak dopadne jeho přechod přes <code>__emscripten_proxy_main</code>. Vše běží na iPadu lokálně ve Workeru. Původní herní soubory se nikam neposílají.</p><div class="card"><label>WASM <input type="file" id="wasm" accept=".wasm"></label><label>MJS <input type="file" id="mjs" accept=".mjs,.js"></label><button id="run">Spustit trasování v2.2.3</button><button id="stop" disabled>Zastavit</button><button id="copy">Kopírovat protokol</button><p id="status">Vyber oba soubory.</p></div><div class="card"><h2>Výstup</h2><pre id="log">—</pre></div><p>Úspěšný návrat factory stále neznamená, že běží herní smyčka. Tento test nemá mapy ani grafické assety; při nedostatku paměti může iPad ukončit kartu. Worker ukončíme po 10 sekundách.</p></main><script>
+const $=id=>document.getElementById(id);let w=null,timer,log=[];function add(s){log.push(s);$('log').textContent=log.slice(-120).join('\n')}function stop(msg){clearTimeout(timer);if(w){w.terminate();w=null}$('run').disabled=false;$('stop').disabled=true;$('status').textContent=msg}
+const code=`
+let log=s=>postMessage(String(s));onerror=e=>log('UNCAUGHT '+e.message);onunhandledrejection=e=>log('UNHANDLED '+e.reason);
+onmessage=async ev=>{let url;try{
+let {js,wasm}=ev.data;let changes=[
+['var pthreadPoolSize=16;','var pthreadPoolSize=0;'],
+['imports[x]=original=new WebAssembly.Suspending(original)','imports[x]=original'],
+['WebAssembly.promising(original)','original'],
+['WebAssembly.promising(getWasmTableEntry(ptr))(arg)','getWasmTableEntry(ptr)(arg)']];
+for(const [a,b] of changes){if(!js.includes(a))throw Error('PATCH_MISSING: '+a);js=js.replaceAll(a,b)}
+const signature='async function callMain(args=[])';if(!js.includes(signature))throw Error('callMain signature missing');
+if(!js.includes(signature+'{'))throw Error('callMain opening brace not found');
+js=js.replace(signature+'{',signature+'{globalThis.__bo1MainEntered=true;console.log("TRACE CALL_MAIN ENTER");');
+log('PATCH callMain opening brace OK');
+const entry='var entryFunction=__emscripten_proxy_main;';if(!js.includes(entry))throw Error('proxy entry missing');
+js=js.replace(entry,'var entryFunction=(...args)=>{console.log("TRACE PROXY_MAIN ENTER argc="+args[0]);try{const r=__emscripten_proxy_main(...args);console.log("TRACE PROXY_MAIN RETURN "+String(r));return r}catch(e){console.log("TRACE PROXY_MAIN THROW "+(e?.stack||e));throw e}};');
+const retval='var ret=entryFunction(argc,argv);exitJS(ret,true);return ret';
+if(!js.includes(retval))throw Error('return site missing');
+js=js.replace(retval,'var ret=entryFunction(argc,argv);console.log("TRACE AFTER PROXY_RETURN "+String(ret));exitJS(ret,true);return ret');
+const origLog=console.log;console.log=(...args)=>{const m=args.map(String).join(' ');if(m.startsWith('TRACE '))log(m);origLog(...args)};
+log('SYNTAX CHECK: Native ES module import (supports import.meta)');
+url=URL.createObjectURL(new Blob([js],{type:'text/javascript'}));const mod=await import(url);log('MODULE IMPORT OK');
+const config={noInitialRun:false,print:x=>log('STDOUT '+x),printErr:x=>log('STDERR '+x),onRuntimeInitialized:()=>log('onRuntimeInitialized'),instantiateWasm:(imports,ready)=>{(async()=>{try{let m=await WebAssembly.compile(wasm);let instance=await WebAssembly.instantiate(m,imports);log('INSTANCE OK');ready(instance,m)}catch(e){log('INSTANTIATE ERROR '+(e?.stack||e))}})()}};
+log('FACTORY ENTER');let result=await mod.default(config);log('FACTORY RETURN; callMainEntered='+!!globalThis.__bo1MainEntered+'; resultType='+typeof result);
+}catch(e){log('ERROR '+(e?.stack||e))}finally{log('TEST END');if(url)URL.revokeObjectURL(url)}};
+`;
+$('run').onclick=async()=>{if(!$('wasm').files.length||!$('mjs').files.length){$('status').textContent='Vyber oba soubory.';return}log=[];add('BO1Z Main Trace v2.2.3');add('UA '+navigator.userAgent);$('run').disabled=true;$('stop').disabled=false;try{const [wasm,js]=await Promise.all([$('wasm').files[0].arrayBuffer(),$('mjs').files[0].text()]);const u=URL.createObjectURL(new Blob([code],{type:'text/javascript'}));w=new Worker(u);URL.revokeObjectURL(u);w.onmessage=e=>{add(e.data);if(e.data==='TEST END')stop('Hotovo. Pošli log.')};w.onerror=e=>{add('WORKER_ERROR '+e.message);stop('Worker skončil chybou.')};w.postMessage({wasm,js},[wasm]);timer=setTimeout(()=>{add('TIMEOUT 10s');stop('Časový limit.')},10000);$('status').textContent='Test běží…'}catch(e){add('PAGE ERROR '+e.message);stop('Nepodařilo se spustit test.')}}
+$('stop').onclick=()=>{add('STOP BY USER');stop('Ukončeno.')};$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(log.join('\n'));$('status').textContent='Zkopírováno.'}catch(e){$('status').textContent='Zkopíruj text ručně.'}};
+</script></body></html>
