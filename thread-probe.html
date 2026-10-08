@@ -1,0 +1,21 @@
+<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BO1Z v2.4 – izolace a vlákna</title><style>body{margin:0;background:#0a1020;color:#f0f5ff;font:16px/1.5 system-ui}main{max-width:720px;margin:auto;padding:26px 18px}h1{font-size:36px}p{color:#b5c6df}.card{border:1px solid #364663;background:#18243b;border-radius:16px;padding:19px;margin:16px 0}button{padding:13px 18px;border:0;border-radius:12px;background:#b7caff;color:#0a1730;font-weight:750;font-size:16px}pre{white-space:pre-wrap;word-break:break-word;background:#080e1c;padding:15px;border-radius:10px;font:12px/1.7 monospace}.note{color:#ffcf8c}</style></head><body><main><p>BO1Z / CESTA A / v2.4</p><h1>Test izolace a vláken</h1><p>Tento test ověřuje přímo na iPadu, zda hosting umožnil <b>cross-origin izolaci, SharedArrayBuffer a skutečného Web Workera se sdílenou pamětí</b>. Neotevírá herní soubory a nespouští BO1Z.</p><div class="card"><button id="run">Otestovat vlákna</button> <button id="copy">Kopírovat log</button><pre id="log">Připraveno.</pre><p id="status"></p></div><p class="note">Na GitHub Pages očekáváme neúspěch izolace. Test otevři na Cloudflare Pages, až bude nasazeno ze stejného GitHub repozitáře.</p></main><script>
+const log=document.querySelector('#log'),status=document.querySelector('#status');let lines=[];
+function add(s){lines.push(s);log.textContent=lines.join('\n')}
+document.querySelector('#run').onclick=async()=>{
+lines=[];add('BO1Z Isolation + Worker test v2.4');add('URL: '+location.href);add('UA: '+navigator.userAgent);
+add('secureContext: '+isSecureContext);add('crossOriginIsolated: '+crossOriginIsolated);add('SharedArrayBuffer: '+typeof SharedArrayBuffer);
+add('WASM JSPI: '+!!(WebAssembly.Suspending&&WebAssembly.promising));
+let worker, url,timer;
+try{
+if(typeof SharedArrayBuffer!=='function')throw Error('SharedArrayBuffer není dostupný – zkontroluj COOP/COEP');
+const sab=new SharedArrayBuffer(4),view=new Int32Array(sab);view[0]=2;add('SharedArrayBuffer allocation: OK');
+const source='onmessage=e=>{try{let a=new Int32Array(e.data);let value=Atomics.add(a,0,3);postMessage({ok:true,before:value,after:Atomics.load(a,0)})}catch(err){postMessage({ok:false,error:String(err)})}}';
+url=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));worker=new Worker(url);
+const result=await new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(Error('Worker timeout after 5 seconds')),5000);worker.onmessage=e=>resolve(e.data);worker.onerror=e=>reject(Error(e.message));worker.postMessage(sab)});
+clearTimeout(timer);add('Worker + Atomics: '+JSON.stringify(result));if(!result.ok||result.after!==5)throw Error('Worker shared-memory roundtrip failed');
+add('RESULT: PASS – cross-origin izolace a sdílení paměti mezi vlákny fungují.');
+status.textContent='Hotovo – pošli mi log.';
+}catch(e){add('RESULT: FAIL – '+e.message);status.textContent='Test selhal – pošli mi log.'}
+finally{clearTimeout(timer);if(worker)worker.terminate();if(url)URL.revokeObjectURL(url)}
+};document.querySelector('#copy').onclick=async()=>{try{await navigator.clipboard.writeText(lines.join('\n'));status.textContent='Zkopírováno.'}catch(e){status.textContent='Zkopíruj výpis ručně.'}};
+</script></body></html>
