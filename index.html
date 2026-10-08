@@ -1,20 +1,36 @@
-<!doctype html>
-<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1020"><title>BO1Z · iPad A16 test</title>
-<style>:root{font-family:system-ui,-apple-system,sans-serif;color:#f6f7fb;background:#0b1020}*{box-sizing:border-box}body{margin:0;padding:24px;max-width:760px;margin:auto}h1{font-size:clamp(28px,6vw,48px);letter-spacing:-1.5px}p{color:#bbc4d6;line-height:1.5}.pill{display:inline-block;border:1px solid #34405b;border-radius:100px;padding:7px 12px;color:#bcc8e5}.card{border:1px solid #2a3854;background:#141d31;border-radius:16px;padding:18px;margin:12px 0}.item{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #2a3854;padding:13px 0}.item:last-child{border:0}.yes{color:#80ecbd}.no{color:#ff948f}.warn{color:#ffcd7c}button{border:0;border-radius:12px;background:#bfd0ff;color:#071027;padding:14px 20px;font-weight:700;font-size:16px;cursor:pointer;margin:12px 12px 12px 0}small{color:#9aabc8}code{word-break:break-all}</style></head>
-<body><span class="pill">BO1Z • iPad A16 • technický test v1.1</span><h1>Diagnostika kompatibility</h1><p>Tato stránka testuje možnosti Safari na iPadu. <strong>Není to hratelná kopie BO1 Zombies.</strong> Výsledky nám pomůžou zjistit, zda vůbec může původní engine běžet na iPadOS.</p><section class="card"><div id="results">Test probíhá…</div></section><button id="copy">Kopírovat výsledky</button><button id="retry">Spustit znovu</button><p id="feedback" aria-live="polite"></p><small>GitHub Pages standardně neposílá vlastní hlavičky COOP/COEP. Bez nich zpravidla nebude dostupná cross-origin izolace a SharedArrayBuffer. Tato stránka nic neposílá na server.</small>
-<script>
-let output="";
-function row(name,good,details,level){let status=good?"OK":level==="warn"?"POZOR":"NE";return '<div class="item"><span>'+name+'<br><small>'+details+'</small></span><strong class="'+(good?"yes":level==="warn"?"warn":"no")+'">'+status+'</strong></div>'}
-function test(){let html="",notes=[];function add(n,b,d,l){html+=row(n,b,d,l);notes.push(n+": "+(b?"OK":l==="warn"?"POZOR":"NE")+" — "+d)}
-add("Dotykové ovládání",navigator.maxTouchPoints>0,"maxTouchPoints: "+navigator.maxTouchPoints);
-add("WebAssembly",typeof WebAssembly==="object","WebAssembly API");
-add("WASM JSPI",!!(window.WebAssembly&&WebAssembly.Suspending&&WebAssembly.promising),"Suspending/promising");
-add("SharedArrayBuffer",typeof SharedArrayBuffer==="function","Vyžaduje bezpečnostní izolaci stránky");
-add("Cross-origin isolation",window.crossOriginIsolated===true,"crossOriginIsolated: "+window.crossOriginIsolated);
-add("WASM Threads",typeof SharedArrayBuffer==="function"&&typeof Atomics==="object","Sdílená paměť + Atomics");
-let canvas=document.createElement("canvas"),gl=null;try{gl=canvas.getContext("webgl2")}catch(e){}add("WebGL2",!!gl,gl?"WebGL2 dostupné":"Kontext nevytvořen");if(gl){let ext=["EXT_color_buffer_float","OES_texture_float_linear","EXT_disjoint_timer_query_webgl2"];for(let x of ext)add(x,!!gl.getExtension(x),"Grafické rozšíření","warn");}
-add("WebGPU",!!navigator.gpu,"navigator.gpu","warn");add("Pointer Lock",!!(document.body.requestPointerLock),"Ovládání kurzoru; přítomnost API nezaručuje použití","warn");
-add("Gamepad API",!!navigator.getGamepads,"Bluetooth ovladač může fungovat","warn");
-document.getElementById("results").innerHTML=html;output=["BO1Z iPad Test v1.1","Čas: "+new Date().toISOString(),"User agent: "+navigator.userAgent,"Platform: "+navigator.platform,...notes].join("\n")}
-document.getElementById("retry").onclick=test;document.getElementById("copy").onclick=async()=>{try{await navigator.clipboard.writeText(output);document.getElementById("feedback").textContent="Zkopírováno. Pošli výsledky do chatu."}catch(e){document.getElementById("feedback").textContent=output}};test();
+<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101523"><title>BO1Z iPad — Rebuild Lab v1.2</title><style>
+*{box-sizing:border-box}body{margin:0;background:#0b0e18;color:#f6f7fa;font:15px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif}main{max-width:840px;margin:auto;padding:24px 18px 80px}h1{font-size:clamp(32px,7vw,52px);line-height:1.1;letter-spacing:-.04em;margin:15px 0}h2{font-size:20px}p{color:#b6c0d7}.tag{border:1px solid #394259;padding:5px 11px;border-radius:40px;color:#b7cbfb;font-size:12px}.panel{background:#161e2d;border:1px solid #2e3951;border-radius:20px;padding:18px;margin-top:18px}.check{border-bottom:1px solid #2b3549;padding:12px 0;display:flex;justify-content:space-between;gap:15px}.check:last-child{border:0}.check small{display:block;color:#9caac5}.pass{color:#88e7ba}.fail{color:#ff9496}.warn{color:#facb78}.badge{font-weight:750;white-space:nowrap}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}button{font:inherit;font-weight:700;border:0;border-radius:12px;background:#b4cbff;padding:12px 16px;color:#0a142a;cursor:pointer}.alt{background:#29374d;color:white}.note{font-size:13px}.notice{background:#292333;border-left:3px solid #ecb66e;padding:14px;border-radius:8px}.spacer{height:10px}#summary{font-weight:700;font-size:17px}</style></head><body><main><span class="tag">REBUILD LAB • v1.2 • iPad A16</span><h1>BO1Z / test herního enginu</h1><p>První fáze rebuild projektu. Tento web <strong>netvrdí, že spouští původní Zombies</strong>; měří předpoklady podle skutečných požadavků enginu získaných z HAR. Žádné herní soubory nepřebíráme ani neposíláme.</p><div class="notice"><strong>Důležité:</strong> GitHub Pages nemá vlastní COOP/COEP hlavičky. Selhání izolace zde neprokazuje, že by Safari tuto funkci obecně neumělo. Následující testy JSPI a grafiky ale zůstávají užitečné.</div><section class="panel"><h2>Výsledky Safari</h2><div id="summary">Probíhá kontrola…</div><div id="tests"></div></section><div class="actions"><button id="copy">Kopírovat diagnostiku</button><button id="again" class="alt">Spustit znovu</button></div><p id="msg" aria-live="polite"></p><section class="panel"><h2>Co port potřebuje</h2><p>Současný engine používá Emscripten, pracovní vlákna, sdílenou WASM paměť a JSPI. Při chybějícím JSPI bude nutný alternativní build ze zdrojového kódu nebo jeho zásadní úprava. WebGL2 zároveň vyžaduje konkrétní formáty a limity; WebGPU samo o sobě nezaručuje kompatibilitu.</p><p class="note">Důležitá kontrola: S3TC komprese, float render target, textura norm16 (nebo dvojice rozšíření), velikosti textur a počty jednotek, offscreen canvas, AudioWorklet, OPFS a pointer lock.</p></section></main><script>
+let report='';
+async function go(){
+const out=[], show=(name,ok,detail,optional=false)=>{out.push({name,ok,detail,optional})};
+const exists=(a)=>!!a;
+show('HTTPS / secure context',isSecureContext,String(isSecureContext));
+show('Dotykový vstup',navigator.maxTouchPoints>0,'maxTouchPoints='+navigator.maxTouchPoints,true);
+show('WebAssembly',typeof WebAssembly==='object','WebAssembly API');
+show('WASM JSPI',typeof WebAssembly==='object'&&typeof WebAssembly.Suspending==='function'&&typeof WebAssembly.promising==='function','Suspending + promising');
+show('Cross-origin izolace',crossOriginIsolated,'crossOriginIsolated='+crossOriginIsolated);
+show('SharedArrayBuffer',typeof SharedArrayBuffer==='function','SAB dostupná na stránce');
+try {let m=new WebAssembly.Memory({initial:1,maximum:24576,shared:true});show('WASM shared memory',m.buffer instanceof SharedArrayBuffer,'shared initial=1, max=24576')}catch(e){show('WASM shared memory',false,e.name+': '+e.message)}
+show('OffscreenCanvas',typeof OffscreenCanvas==='function'&&!!HTMLCanvasElement.prototype.transferControlToOffscreen,'transferControlToOffscreen');
+show('Worker',typeof Worker==='function','Worker API');
+show('AudioWorklet',!!(window.AudioContext&&window.AudioWorkletNode&&'audioWorklet'in AudioContext.prototype),'AudioContext + AudioWorklet');
+show('OPFS / file storage',!!(navigator.storage?.getDirectory&&navigator.storage?.estimate&&navigator.storage?.persist&&navigator.locks),'OPFS, storage quota, persist, Web Locks');
+show('Pointer Lock',!!(Element.prototype.requestPointerLock&&Document.prototype.exitPointerLock),'API existuje (ovládání dotykem není ověřeno)');
+show('WASM exception handling',!!(window.WebAssembly&&WebAssembly.Tag),'WebAssembly.Tag');
+show('Gamepad API',!!navigator.getGamepads,'Gamepad API',true);
+let gl;try{gl=document.createElement('canvas').getContext('webgl2')}catch(e){}
+show('WebGL2',!!gl,'WebGL2 context');
+if(gl){
+const required=['WEBGL_compressed_texture_s3tc','EXT_color_buffer_float'];
+for(const e of required)show(e,!!gl.getExtension(e),'Povinné rozšíření');
+const norm=!!gl.getExtension('EXT_texture_norm16'),linear=!!gl.getExtension('OES_texture_float_linear'),blend=!!gl.getExtension('EXT_float_blend');
+show('EXT_texture_norm16 nebo fallback',norm||(linear&&blend),'norm16='+norm+'; float_linear='+linear+'; float_blend='+blend);
+for(const [k,min] of [['MAX_TEXTURE_SIZE',2048],['MAX_3D_TEXTURE_SIZE',256],['MAX_TEXTURE_IMAGE_UNITS',16],['MAX_VERTEX_TEXTURE_IMAGE_UNITS',4],['MAX_COMBINED_TEXTURE_IMAGE_UNITS',20],['MAX_VERTEX_UNIFORM_VECTORS',264],['MAX_FRAGMENT_UNIFORM_VECTORS',264],['MAX_VERTEX_ATTRIBS',16]]){const actual=gl.getParameter(gl[k]);show(k,actual>=min,actual+' / min '+min)}
+}
+const fails=out.filter(x=>!x.ok&&!x.optional);
+document.getElementById('summary').textContent=fails.length===0?'Základní předpoklady splněny; samotná hra dosud netestována.':'Nesplněných požadavků: '+fails.length+'. Pro stávající build je to překážka.';
+document.getElementById('tests').innerHTML=out.map(x=>'<div class="check"><div><strong>'+x.name+'</strong><small>'+String(x.detail).replaceAll('&','&amp;').replaceAll('<','&lt;')+'</small></div><span class="badge '+(x.ok?'pass':x.optional?'warn':'fail')+'">'+(x.ok?'OK':x.optional?'VOLITELNÉ':'CHYBÍ')+'</span></div>').join('');
+report=['BO1Z Rebuild v1.2',new Date().toISOString(),'User agent: '+navigator.userAgent,'Platform: '+navigator.platform,...out.map(x=>x.name+': '+(x.ok?'OK':x.optional?'VOLITELNÉ':'CHYBÍ')+' — '+x.detail)].join('\n');
+}
+document.getElementById('again').onclick=go;document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(report);document.getElementById('msg').textContent='Zkopírováno — pošli mi výsledek do chatu.'}catch(e){document.getElementById('msg').textContent='Kopírování selhalo; označ text níže.';let p=document.createElement('pre');p.textContent=report;document.getElementById('msg').appendChild(p)}};go();
 </script></body></html>
