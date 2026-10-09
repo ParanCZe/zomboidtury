@@ -121,7 +121,8 @@ export default {
         if(mf.map!=="zombie_theater"||!Array.isArray(mf.files))
           throw Error("Unexpected manifest");
         const entry=mf.files.find(x=>x.path===path);
-        if(!entry||!Array.isArray(entry.br)||part>=entry.br.length||!entry.br.length)
+        if(!entry||!Array.isArray(entry.br)||!entry.br.length||
+           part>=Math.max(entry.br.length,Math.ceil(entry.size/8388608)))
           return new Response("Chunk not in manifest",{status:404});
         const upstream=await fetch("https://cdn.vel.gg/packs/kino/"+path+".br/"+part+
           "?v="+entry.sha256.slice(0,16),{redirect:"manual"});
@@ -156,8 +157,8 @@ export default {
         if(mf.map!=="zombie_theater" || !Array.isArray(mf.files))
           throw Error("Unexpected manifest");
         const entry=mf.files.find(x=>x.path===path);
-        if(!entry || (Array.isArray(entry.br)&&entry.br.length) ||
-           !Number.isSafeInteger(entry.size) || entry.size<=0)
+        if(!entry || !Number.isSafeInteger(entry.size) || entry.size<=0 ||
+           (!path.endsWith(".iwd") && !path.endsWith(".ff")))
           return new Response("Raw path not permitted", {status:404});
         const upstream=await fetch("https://cdn.vel.gg/packs/kino/"+path,{
           redirect:"manual",headers:{"Accept-Encoding":"identity"}});
