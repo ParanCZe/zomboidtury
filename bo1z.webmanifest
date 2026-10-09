@@ -1,0 +1,19 @@
+{
+  "name": "BO1 Zombies – Kino der Toten",
+  "short_name": "BO1Z",
+  "description": "Soukromý launcher původního BO1 Zombies WebGL enginu a lokálních herních dat.",
+  "start_url": "/launcher?v=1",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#070b12",
+  "theme_color": "#0d1422",
+  "icons": [
+    {
+      "src": "/bo1z-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
