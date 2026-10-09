@@ -29,7 +29,7 @@ function resumePart(e,file){
   const s=JSON.parse(localStorage.getItem(partKey(e))||"null");
   if(s && s.sha===e.sha256 && s.count===e.br.length && s.size===file.size &&
     s.lastModified===file.lastModified && Number.isInteger(s.next) &&
-    s.next>=0 && s.next<=e.br.length)return s;
+    s.next>=0 && s.next<=Math.max(e.br.length,Math.ceil(e.size/CHUNK)))return s;
  }catch{}
  return null;
 }
@@ -40,7 +40,7 @@ function markPart(e,next,file){
 }
 async function streamPart(h,e,i,offset,ctx){
  let last;
- for(let attempt=1;attempt<=4;attempt++){
+ for(let attempt=1;attempt<=(ctx.recovery?1:4);attempt++){
   if(ctx.cancelled?.())throw Error("Stahování pozastaveno");
   try{
    const url="/api/kino/chunk-stream?path="+encodeURIComponent(e.path)+"&part="+i;
@@ -99,24 +99,48 @@ async function eachFile(root,e,ctx){
   clearPart(e);
   await rawFile(h,e,ctx);
  }else{
-  // The manifest's br array defines the number of CDN blocks. Their
-  // decompressed lengths vary; e.size is the size of the entire file.
+  // The manifest's br count may omit an 8MiB tail on localized IWD archives.
+  // Preserve complete parts and try CDN recovery before raw archive fallback.
   const state=resumePart(e,before);
-  let offset=state?.size||0, next=state?.next||0;
+  let offset=state?.size||0,next=state?.next||0;
   if(!state && before.size!==0)await shrink(h,0);
-  if(!state && before.size===0)offset=0;
-  if(state && (offset>e.size || (next===e.br.length && offset!==e.size))){
+  if(offset>e.size || next>Math.max(e.br.length,Math.ceil(e.size/CHUNK))){
    offset=0;next=0;clearPart(e);await shrink(h,0);
   }
   ctx.progress(e,offset);
-  for(let i=next;i<e.br.length;i++){
+  for(let i=next;i<e.br.length && offset<e.size;i++){
    if(ctx.cancelled?.())throw Error("Stahování pozastaveno");
-   const updated=await streamPart(h,e,i,offset,ctx);
-   if(i===e.br.length-1&&updated!==e.size)
-    throw Error("Poslední blok archivu skončil na "+updated+" z "+e.size+
-     " bajtů: "+e.path+" – server nevrátil celý soubor");
-   offset=updated;
+   offset=await streamPart(h,e,i,offset,ctx);
    markPart(e,i+1,await h.getFile());
+  }
+  if(offset<e.size){
+   ctx.status("Manifest neobsahuje celý archiv "+e.path+
+    ". Zkouším získat chybějících "+(e.size-offset)+" bajtů.");
+   let tailError=null;
+   const upper=Math.max(e.br.length,Math.ceil(e.size/CHUNK));
+   const startPart=Math.max(next,e.br.length);
+   for(let i=startPart;i<upper && offset<e.size;i++){
+    try{
+     offset=await streamPart(h,e,i,offset,{...ctx,recovery:true});
+     markPart(e,i+1,await h.getFile());
+    }catch(error){tailError=error;break}
+   }
+   if(offset<e.size){
+    ctx.status("Z CDN dorazilo "+offset+"/"+e.size+
+     " bajtů "+e.path+". Zkouším přímý archiv.");
+    try{
+     await rawFile(h,e,ctx);
+     offset=(await h.getFile()).size;
+     clearPart(e);
+    }catch(error){
+     throw Error("Zdroj neposkytuje celý archiv "+e.path+
+      ": získáno "+offset+"/"+e.size+" bajtů. "+
+      "Chybí "+(e.size-offset)+" bajtů. "+
+      "Další blok: "+(tailError?.message||"není dostupný")+
+      "; přímý archiv: "+error.message+
+      ". Ostatní uložená data se nemažou.");
+    }
+   }
   }
  }
  const finished=await h.getFile();
