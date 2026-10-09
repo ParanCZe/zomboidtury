@@ -71,8 +71,18 @@ modURL=URL.createObjectURL(new Blob([source],{type:"text/javascript"}));
 const factory=(await import(modURL)).default;
 if(typeof factory!=="function")throw Error("Originální MJS neexportuje Emscripten factory");
 log("ORIGINAL MJS IMPORTED");
+const memoryImport=WebAssembly.Module.imports(compiled).find(x=>x.kind==="memory");
+log("WASM MEMORY IMPORT",JSON.stringify(memoryImport));
+let memory;
+try{
+const min=memoryImport?.type?.minimum??32767,max=memoryImport?.type?.maximum??32767;
+const shared=memoryImport?.type?.shared??true;
+log("MEMORY REQUEST","pages="+min,"max="+max,"shared="+shared,"estimated MiB="+Math.round(min*65536/1048576));
+memory=new WebAssembly.Memory({initial:min,maximum:max,shared});
+log("MEMORY ALLOCATED",memory.buffer.byteLength,"bytes");
+}catch(e){log("MEMORY ALLOCATION FAILED",e.name,e.message||"(no browser message)");throw e}
 const config={
-canvas,noInitialRun:true,pthreadWorkerURL:modURL,
+canvas,noInitialRun:true,pthreadWorkerURL:modURL,wasmMemory:memory,
 print:t=>log("ENGINE",t),printErr:t=>log("ENGINE ERR",t),
 onAbort:t=>log("ENGINE ABORT",t),onExit:code=>log("ENGINE EXIT",code),
 onRuntimeInitialized:()=>log("RUNTIME INITIALIZED"),
@@ -87,7 +97,7 @@ stat("Spouštím originální main; pokud nejsou data mapy, čekej chybu soubor�
 showUI(false);
 try{const code=await module.callMain(args);log("ORIGINAL MAIN RETURN",String(code));stat("Main skončil: "+String(code)+" – zkontroluj log");showUI(true)}
 catch(err){log("MAIN ERROR",err.stack||err.message);stat("Herní main skončil chybou – viz protokol.");showUI(true)}
-}catch(err){log("BOOT ERROR",err.stack||err.message);stat("Start selhal – pošli protokol.");showUI(true)}
+}catch(err){log("BOOT ERROR",err.name||"",err.message||"(no browser message)",err.stack||"");stat("Start selhal – pošli protokol.");showUI(true)}
 finally{clearTimeout(timeout);booting=false;$("boot").disabled=false}
 };
 })();
