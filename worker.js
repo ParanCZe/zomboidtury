@@ -70,6 +70,39 @@ export default {
         return new Response("Chunk proxy failed: " + (e?.message || "unknown"), { status: 502 });
       }
     }
+    if (url.pathname === "/api/kino/chunk") {
+      try {
+        const path = url.searchParams.get("path") || "";
+        const partText = url.searchParams.get("part") || "";
+        if (!/^[a-zA-Z0-9_./-]{1,160}$/.test(path) || path.includes("..") || !/^(0|[1-9][0-9]{0,2})$/.test(partText)) {
+          return new Response("Invalid chunk request", { status: 400 });
+        }
+        const part = Number(partText);
+        const mr = await fetch("https://vel.gg/bo1z/kino/manifest.json", { redirect: "manual", cf: {cacheTtl:120,cacheEverything:true}});
+        if (!mr.ok) throw new Error("Manifest upstream HTTP "+mr.status);
+        const mf=await mr.json();
+        if(mf.map!=="zombie_theater" || !Array.isArray(mf.files)) throw new Error("Unexpected manifest");
+        const entry=mf.files.find(x=>x.path===path);
+        if(!entry || !Array.isArray(entry.br) || part>=entry.br.length) return new Response("Chunk not in manifest",{status:404});
+        const upstreamUrl="https://cdn.vel.gg/packs/kino/"+path+".br/"+part+"?v="+entry.sha256.slice(0,16);
+        const r=await fetch(upstreamUrl,{redirect:"manual"});
+        if(!r.ok) return new Response("CDN upstream HTTP "+r.status,{status:502});
+        if(r.status>=300&&r.status<400) return new Response("Unexpected CDN redirect",{status:502});
+        const max=8388608+1048576;
+        const length=Number(r.headers.get("content-length")||0);
+        if(length>max) return new Response("Chunk exceeds limit",{status:502});
+        const bytes=await r.arrayBuffer();
+        if(bytes.byteLength>max) return new Response("Chunk exceeds limit",{status:502});
+        return new Response(bytes,{headers:{
+          "Content-Type":"application/octet-stream",
+          "Cache-Control":"public, max-age=300",
+          "Cross-Origin-Resource-Policy":"same-origin",
+          "Cross-Origin-Opener-Policy":"same-origin",
+          "Cross-Origin-Embedder-Policy":"require-corp",
+          "X-Content-Type-Options":"nosniff"
+        }});
+      }catch(e){return new Response("Chunk proxy error: "+(e?.message||"unknown"),{status:502});}
+    }
     // Restrict repository and deployment internals even if an ignore rule is misconfigured.
     if (/(^|\/)\.(?:git|wrangler|env)(?:\/|$)/i.test(url.pathname) ||
         /(?:^|\/)(?:wrangler\.jsonc?|package(?:-lock)?\.json|worker\.js|\.assetsignore)(?:$|\/)/i.test(url.pathname)) {
