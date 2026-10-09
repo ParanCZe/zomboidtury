@@ -1,39 +1,454 @@
-<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101523"><title>BO1Z iPad — Rebuild Lab v1.3</title><style>
-*{box-sizing:border-box}body{margin:0;background:#0b0e18;color:#f6f7fa;font:15px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif}main{max-width:840px;margin:auto;padding:24px 18px 80px}h1{font-size:clamp(32px,7vw,52px);line-height:1.1;letter-spacing:-.04em;margin:15px 0}h2{font-size:20px}p{color:#b6c0d7}.tag{border:1px solid #394259;padding:5px 11px;border-radius:40px;color:#b7cbfb;font-size:12px}.panel{background:#161e2d;border:1px solid #2e3951;border-radius:20px;padding:18px;margin-top:18px}.check{border-bottom:1px solid #2b3549;padding:12px 0;display:flex;justify-content:space-between;gap:15px}.check:last-child{border:0}.check small{display:block;color:#9caac5}.pass{color:#88e7ba}.fail{color:#ff9496}.warn{color:#facb78}.badge{font-weight:750;white-space:nowrap}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}button{font:inherit;font-weight:700;border:0;border-radius:12px;background:#b4cbff;padding:12px 16px;color:#0a142a;cursor:pointer}.alt{background:#29374d;color:white}.note{font-size:13px}.notice{background:#292333;border-left:3px solid #ecb66e;padding:14px;border-radius:8px}.spacer{height:10px}#summary{font-weight:700;font-size:17px}</style></head><body><div style="position:relative;z-index:99;margin:10px auto 18px;max-width:840px;padding:12px 18px;border:1px solid #d3a874;border-radius:14px;background:#2f291e"><a style="display:block;text-align:center;color:#ffdaa2;font-weight:800;text-decoration:none;font-size:19px" href="./mobile.html">🎮 SPUSTIT ORIGINÁLNÍ BO1Z – iPad / iPhone</a><p style="margin:5px 0 0;text-align:center;color:#c8beb0;font-size:12px">Experimentální mobilní spouštěč skutečného KisakBlack enginu; vyžaduje původní soubory a mapové balíčky.</p></div><main><span class="tag">REBUILD LAB • v1.3 • iPad A16</span><h1>BO1Z / test herního enginu</h1><p>První fáze rebuild projektu. Tento web <strong>netvrdí, že spouští původní Zombies</strong>; měří předpoklady podle skutečných požadavků získaných z HAR a dodaného KisakBlack-web.mjs. Žádné herní soubory nepřebíráme ani neposíláme.</p><div class="notice"><strong>Důležité:</strong> GitHub Pages nemá vlastní COOP/COEP hlavičky. Selhání izolace zde neprokazuje, že by Safari tuto funkci obecně neumělo. Následující testy JSPI a grafiky ale zůstávají užitečné.</div><section class="panel"><h2>Výsledky Safari</h2><div id="summary">Probíhá kontrola…</div><div id="tests"></div></section><div class="actions"><button id="copy">Kopírovat diagnostiku</button><button id="again" class="alt">Spustit znovu</button></div><p id="msg" aria-live="polite"></p><section class="panel"><h2>Co port potřebuje</h2><p>Analýza dodaného KisakBlack-web.mjs potvrdila Emscripten PThreads, WebAssembly.Suspending / WebAssembly.promising a počáteční sdílenou paměť 32767 WASM stránek (~2 GiB). Při chybějícím JSPI bude nutný alternativní build ze zdrojového kódu nebo jeho zásadní úprava. WebGL2 zároveň vyžaduje konkrétní formáty a limity; WebGPU samo o sobě nezaručuje kompatibilitu.</p><p class="note">Důležitá kontrola: S3TC komprese, float render target, textura norm16 (nebo dvojice rozšíření), velikosti textur a počty jednotek, offscreen canvas, AudioWorklet, OPFS a pointer lock.</p></section></main><script>
-let report='';
-async function go(){
-const out=[], show=(name,ok,detail,optional=false)=>{out.push({name,ok,detail,optional})};
-const exists=(a)=>!!a;
-show('HTTPS / secure context',isSecureContext,String(isSecureContext));
-show('Dotykový vstup',navigator.maxTouchPoints>0,'maxTouchPoints='+navigator.maxTouchPoints,true);
-show('WebAssembly',typeof WebAssembly==='object','WebAssembly API');
-show('WASM JSPI',typeof WebAssembly==='object'&&typeof WebAssembly.Suspending==='function'&&typeof WebAssembly.promising==='function','Suspending + promising');
-show('Cross-origin izolace',crossOriginIsolated,'crossOriginIsolated='+crossOriginIsolated);
-show('SharedArrayBuffer',typeof SharedArrayBuffer==='function','SAB dostupná na stránce');
-try {let m=new WebAssembly.Memory({initial:1,maximum:24576,shared:true});show('WASM shared memory',m.buffer instanceof SharedArrayBuffer,'shared initial=1, max=24576')}catch(e){show('WASM shared memory',false,e.name+': '+e.message)}
-show('OffscreenCanvas',typeof OffscreenCanvas==='function'&&!!HTMLCanvasElement.prototype.transferControlToOffscreen,'transferControlToOffscreen');
-show('Worker',typeof Worker==='function','Worker API');
-show('AudioWorklet',!!(window.AudioContext&&window.AudioWorkletNode&&'audioWorklet'in AudioContext.prototype),'AudioContext + AudioWorklet');
-show('OPFS / file storage',!!(navigator.storage?.getDirectory&&navigator.storage?.estimate&&navigator.storage?.persist&&navigator.locks),'OPFS, storage quota, persist, Web Locks');
-show('Pointer Lock',!!(Element.prototype.requestPointerLock&&Document.prototype.exitPointerLock),'API existuje (ovládání dotykem není ověřeno)');
-show('WASM exception handling',!!(window.WebAssembly&&WebAssembly.Tag),'WebAssembly.Tag');
-show('Gamepad API',!!navigator.getGamepads,'Gamepad API',true);
-try {let m=new WebAssembly.Memory({initial:32767,maximum:32767,shared:true});show('Původní WASM rezervace 2 GiB',true,'32767 sdílených stránek (alokace úspěšná)')}catch(e){show('Původní WASM rezervace 2 GiB',false,e.name+': '+e.message)}
-if(navigator.gpu){try{const a=await navigator.gpu.requestAdapter();show('WebGPU adaptér',!!a,a?'GPU adapter dostupný':'Adapter nenalezen');if(a){const bc=a.features.has('texture-compression-bc');show('WebGPU BC komprese',bc,'texture-compression-bc; alternativa k S3TC');const max=a.limits.maxTextureDimension2D;show('WebGPU textura 2D ≥ 4096',max>=4096,'maxTextureDimension2D='+max)}}catch(e){show('WebGPU adapter/BC',false,e.name+': '+e.message)}}
+<!DOCTYPE html>
+<!--
+  KisakBlack — WebGL2/WASM boot harness.
 
-let gl;try{gl=document.createElement('canvas').getContext('webgl2')}catch(e){}
-show('WebGL2',!!gl,'WebGL2 context');
-if(gl){
-const required=['WEBGL_compressed_texture_s3tc','EXT_color_buffer_float'];
-for(const e of required)show(e,!!gl.getExtension(e),'Povinné rozšíření');
-const norm=!!gl.getExtension('EXT_texture_norm16'),linear=!!gl.getExtension('OES_texture_float_linear'),blend=!!gl.getExtension('EXT_float_blend');
-show('EXT_texture_norm16 nebo fallback',norm||(linear&&blend),'norm16='+norm+'; float_linear='+linear+'; float_blend='+blend);
-for(const [k,min] of [['MAX_TEXTURE_SIZE',2048],['MAX_3D_TEXTURE_SIZE',256],['MAX_TEXTURE_IMAGE_UNITS',16],['MAX_VERTEX_TEXTURE_IMAGE_UNITS',4],['MAX_COMBINED_TEXTURE_IMAGE_UNITS',20],['MAX_VERTEX_UNIFORM_VECTORS',264],['MAX_FRAGMENT_UNIFORM_VECTORS',264],['MAX_VERTEX_ATTRIBS',16]]){const actual=gl.getParameter(gl[k]);show(k,actual>=min,actual+' / min '+min)}
-}
-const fails=out.filter(x=>!x.ok&&!x.optional);
-document.getElementById('summary').textContent=fails.length===0?'Základní předpoklady splněny; samotná hra dosud netestována.':'Nesplněných požadavků: '+fails.length+'. Pro stávající build je to překážka.';
-document.getElementById('tests').innerHTML=out.map(x=>'<div class="check"><div><strong>'+x.name+'</strong><small>'+String(x.detail).replaceAll('&','&amp;').replaceAll('<','&lt;')+'</small></div><span class="badge '+(x.ok?'pass':x.optional?'warn':'fail')+'">'+(x.ok?'OK':x.optional?'VOLITELNÉ':'CHYBÍ')+'</span></div>').join('');
-report=['BO1Z Rebuild v1.3',new Date().toISOString(),'User agent: '+navigator.userAgent,'Platform: '+navigator.platform,...out.map(x=>x.name+': '+(x.ok?'OK':x.optional?'VOLITELNÉ':'CHYBÍ')+' — '+x.detail)].join('\n');
-}
-document.getElementById('again').onclick=go;document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(report);document.getElementById('msg').textContent='Zkopírováno — pošli mi výsledek do chatu.'}catch(e){document.getElementById('msg').textContent='Kopírování selhalo; označ text níže.';let p=document.createElement('pre');p.textContent=report;document.getElementById('msg').appendChild(p)}};go();
-</script></body></html>
+  Flow: the page loads web_fs.js (the File System Access bridge), then the user
+  clicks "Pick Steam folder" to grant the local "Call of Duty Black Ops" install.
+  Only after a folder is granted (or the fake-file smoke FS is enabled) is the
+  wasm started, so the engine's first synchronous file reads find data.
+
+  Two builds share this harness:
+   * Single-threaded + Asyncify (build_web/link_web): does NOT require COOP/COEP;
+     serve with any static server (python3 -m http.server).
+   * Multithreaded + pthreads (build_web_mt/link_web_mt): REQUIRES cross-origin
+     isolation (COOP: same-origin, COEP: require-corp) + a secure context for
+     SharedArrayBuffer. GitHub Pages gets those policies from coi-serviceworker.js;
+     custom/local hosting can send them directly (serve_web_mt.py does). The render
+     backend runs on its own Web Worker and owns the WebGL2 context (proxied to this
+     canvas); main() runs on a proxied worker. The <canvas id="canvas"> below stays on
+     this DOM thread — the worker's GL context targets "#canvas" and proxies to it.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>KisakBlack (WebGL2)</title>
+<!-- GitHub Pages cannot set COOP/COEP response headers. This service worker
+     supplies them and reloads once so the pthread build can use SharedArrayBuffer. -->
+<script>
+  // The experimental mobile build is single-threaded and needs no isolation worker.
+  if (!new URLSearchParams(location.search).has('mobile') && !matchMedia('(pointer: coarse)').matches) {
+    const workerScript = document.createElement('script');
+    workerScript.src = 'coi-serviceworker.js'; document.head.append(workerScript);
+  }
+</script>
+<style>
+  body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+  #bar { padding: 8px 12px; background: #1c1c1c; display: flex; gap: 12px; align-items: center; }
+  #bar button { padding: 6px 14px; cursor: pointer; }
+  #status { font-size: 13px; color: #9c9; }
+  #canvas { display: block; width: 100vw; height: calc(100vh - 44px); background: #000; }
+  canvas.emscripten { outline: none; }
+</style>
+</head>
+<body>
+  <!-- On-page error console: surfaces startup failures (e.g. an OffscreenCanvas/de-proxy
+       black-screen) as visible red text to screenshot, even when the dev console is closed. -->
+  <div id="kberr" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#600;color:#fff;font:12px/1.4 monospace;white-space:pre-wrap;max-height:45%;overflow:auto;padding:6px;display:none"></div>
+  <script>
+    (function(){
+      var box=document.getElementById('kberr');
+      window.__kbShowErr=function(m){ try{ box.style.display='block'; box.textContent+=String(m)+"\n"; }catch(e){} };
+      window.addEventListener('error',function(e){ window.__kbShowErr('[error] '+(e.message||e.error||e)+(e.filename?(' @'+e.filename+':'+e.lineno):'')); });
+      window.addEventListener('unhandledrejection',function(e){ window.__kbShowErr('[reject] '+((e.reason&&e.reason.message)||e.reason||e)); });
+    })();
+  </script>
+  <!-- Audio autoplay-policy unlock: the browser creates the OpenAL AudioContext SUSPENDED until a
+       user gesture, so the game runs but is silent. Track every AudioContext (wrap the constructor
+       BEFORE blackops.js creates one — incl. the proxied DOM-thread one) and resume them on the
+       first interaction. Standard web-audio unlock; no engine change needed. -->
+  <script>
+    (function(){
+      var ctxs=[];
+      ['AudioContext','webkitAudioContext'].forEach(function(name){
+        var Orig=window[name]; if(!Orig||Orig.__kbWrapped) return;
+        function Wrapped(){ var c=new Orig(arguments[0]); try{ctxs.push(c);}catch(e){} return c; }
+        Wrapped.prototype=Orig.prototype; Wrapped.__kbWrapped=1;
+        try{ window[name]=Wrapped; }catch(e){}
+      });
+      function resumeAll(){ var any=false; ctxs.forEach(function(c){ try{ if(c&&c.state==='suspended'){ c.resume(); any=true; } }catch(e){} });
+        if(any&&window.console) console.log('[kb] audio: resumed '+ctxs.length+' AudioContext(s) on user gesture'); }
+      ['pointerdown','mousedown','keydown','touchstart','click'].forEach(function(ev){
+        window.addEventListener(ev, resumeAll, true);
+      });
+    })();
+  </script>
+  <div id="bar">
+    <button id="pick">Pick Steam "Call of Duty Black Ops" folder</button>
+    <label><input type="checkbox" id="fake" /> fake-file smoke test (no data)</label>
+    <span id="status">waiting for a data folder…</span>
+  </div>
+  <div style="position:relative">
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    <!-- De-proxy GL target: a hidden canvas NOTHING else touches. Extensions/recorders
+         grab the visible #canvas (captureStream) which then can never be transferred
+         offscreen ("Cannot transfer OffscreenCanvas bound to element using captureStream").
+         The engine transfers THIS one to the render worker instead; frames still reach
+         the user via the #display overlay present path, and input stays on #canvas. -->
+    <!-- VISIBLE (2x2, near-transparent, in-viewport): Chrome discards the GPU context
+         of never-composited canvases first under memory pressure — a display:none
+         placeholder made the worker's context the designated victim at map load
+         (half-dead channel: client-side queries fine, every GPU round-trip nulls). -->
+    <canvas id="kbgl" width="2" height="2"
+            style="position:fixed;right:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none"></canvas>
+    <!-- DE-PROXY display overlay: when the render worker owns the canvas as an
+         OffscreenCanvas (KB_DEPROXY build), implicit frame propagation never happens
+         (the render thread never yields its event loop), so the worker posts each frame
+         as an ImageBitmap and we draw it here. pointer-events:none keeps mouse input
+         landing on #canvas. Idle/transparent on the stock proxied build. -->
+    <canvas id="display" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none"></canvas>
+  </div>
+
+  <!-- DE-PROXY frame interception: wrap Worker so we see every pthread worker the
+       runtime spawns and catch the render worker's {kbFrame: ImageBitmap} posts.
+       addEventListener at construction is ordered BEFORE Emscripten's later .onmessage
+       assignment, and stopImmediatePropagation() keeps kbFrame messages out of the
+       pthread message dispatcher. MUST run before blackops.js loads. -->
+  <script>
+    (function () {
+      var dctx = null, disp = null, kbRecv = 0;
+      function kbPresent(bmp, ackPtr) {
+        try {
+          if (!dctx) { disp = document.getElementById('display'); dctx = disp.getContext('bitmaprenderer'); }
+          if (disp.width !== bmp.width || disp.height !== bmp.height) { disp.width = bmp.width; disp.height = bmp.height; }
+          dctx.transferFromImageBitmap(bmp);
+          // Confirm the PAGE actually receives + draws frames (vs the worker thinking it
+          // posted). First frame + every 120th: if these print but the screen is black,
+          // the issue is the #display overlay/CSS, not the present hand-off.
+          if ((kbRecv++ % 120) === 0)
+            console.log('[kbpresent] page drew frame #' + kbRecv + ' (' + bmp.width + 'x' + bmp.height +
+                        ', #display ' + disp.width + 'x' + disp.height + ')');
+        } catch (e) {
+          try { bmp.close(); } catch (_) {}
+          // A silently-failing present = permanent black while the engine keeps
+          // running. Be loud and self-heal: drop the cached context so the next
+          // frame recreates it.
+          if (!window.__kbPresErr) { window.__kbPresErr = 1; console.error('[kbpresent] present failed (will retry): ', e); }
+          dctx = null;
+        }
+        // Backpressure ack: the worker drops frames (no new ImageBitmap) until this flag
+        // clears — unconsumed bitmaps piling up OOMed the GPU process (empty-log shader
+        // compile failures + tab crashes). HEAP32 is the shared wasm heap.
+        try { if (ackPtr && window.Module && Module.HEAP32) Atomics.store(Module.HEAP32, ackPtr >> 2, 0); } catch (e) {}
+      }
+      // De-proxy IMPLICIT present: the render worker owns #kbgl as an OffscreenCanvas and commits
+      // it directly on its per-frame event-loop yield (KB_RenderThreadYield). So #kbgl IS the
+      // visible game canvas — promote it to fill the screen behind #canvas, and turn #canvas into
+      // a transparent input-only overlay on top. No transferToImageBitmap readback (that leaked
+      // renderer RAM to ~5GB), no #display overlay. Fired once when the worker signals it has a
+      // local context (kbImplicitPresent). (?manualpresent keeps the old readback path instead.)
+      var kbWentImplicit = false;
+      function kbGoImplicit() {
+        if (kbWentImplicit) return; kbWentImplicit = true;
+        try {
+          var kg = document.getElementById('kbgl');
+          if (kg) kg.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;opacity:1;pointer-events:none;z-index:0';
+          var cv = document.getElementById('canvas');
+          if (cv) { cv.style.background = 'transparent'; cv.style.position = 'relative'; cv.style.zIndex = '1'; }
+          var dp = document.getElementById('display');
+          if (dp) dp.style.display = 'none';
+          console.log('[kbpresent] implicit OffscreenCanvas present active (#kbgl is the visible canvas)');
+        } catch (e) { console.error('[kbpresent] kbGoImplicit failed:', e); }
+      }
+      var RealWorker = window.Worker;
+      window.Worker = function (url, opts) {
+        var w = new RealWorker(url, opts);
+        w.addEventListener('message', function (e) {
+          if (e.data && e.data.kbFrame) { e.stopImmediatePropagation(); kbPresent(e.data.kbFrame, e.data.kbAck); }
+          else if (e.data && e.data.kbImplicitPresent) { e.stopImmediatePropagation(); kbGoImplicit(); }
+        });
+        return w;
+      };
+      window.Worker.prototype = RealWorker.prototype;
+    })();
+  </script>
+
+  <!-- Emscripten Module config MUST exist before blackops.js loads. -->
+  <script>
+    window.Module = {
+      canvas: (function () { return document.getElementById('canvas'); })(),
+      arguments: ['+devmap', (new URLSearchParams(location.search).get('map') || 'mp_nuked')],   // ?map=<name> overrides; edit or add +set dvar value
+      noInitialRun: true,            // we call run() ourselves after data is ready
+      print:    (t) => console.log(t),
+      printErr: (t) => { console.warn(t); try { if (/error|abort|exception|fail|fatal|GL_INVALID|context/i.test(t)) window.__kbShowErr && window.__kbShowErr(t); } catch(e){} },
+      onAbort:  (w) => { try { window.__kbShowErr && window.__kbShowErr('[abort] ' + w); } catch(e){} },
+      setStatus: (t) => { if (t) document.getElementById('status').textContent = t; },
+      // NOTE: Emscripten's default $HOME is already '/home/web_user' (see getEnvStrings),
+      // so getenv("HOME") is non-empty and SHGetFolderPathA() resolves the engine's
+      // "user documents" base to /home/web_user/Activision/CoD — never /tmp.
+      // preRun: create every writable path the engine touches at boot in MEMFS so a
+      // config/log/screenshot write never throws ErrnoError 44 (ENOENT). Game-asset
+      // READS still go through the File System Access bridge (KBFS); these MEMFS dirs
+      // only back the engine's WRITES (console_mp.log, players/, config). FS is on the
+      // EXPORTED_RUNTIME_METHODS list, so it's available here in preRun.
+      preRun: [function () {
+        // Perf toggles: ?batch=1 / ?coalesce=1 on the page URL reach the GL layer via
+        // ENV (forwarded to pthreads). Defaults are OFF while a post-B45 crash is isolated.
+        try {
+          var q = new URLSearchParams(location.search);
+          if (q.get('batch') === '0')    ENV.KB_BATCH = '0';     // default ON
+          if (q.get('coalesce') === '0') ENV.KB_COALESCE = '0';  // default ON
+          if (q.get('shadows') === '1')  ENV.KB_SHADOWS = '1';
+          if (q.get('shadows') === '0')  ENV.KB_SHADOWS = '0';
+          if (q.get('noocc') === '1')    Module.arguments.push('+set', 'r_enableOccluders', '0');
+          if (q.get('dumpenv') === '1')  ENV.KB_DUMPENV = '1';
+          if (q.get('noportal') === '1') Module.arguments.push('+set', 'r_kbNoPortal', '1');
+          // ?noprepass=1: skip the depth pre-pass. It re-draws all opaque geometry to
+          // depth before the color pass — a native-GPU overdraw optimization that just
+          // ~doubles the (expensive) draw-call count on the web build, which is
+          // draw-call-bound not shading-bound. Trades overdraw (free on a real GPU) for
+          // far fewer GL calls. May affect some alpha-test geometry (trees).
+          if (q.get('noprepass') === '1' || q.get('nopreprass') === '1' || q.get('noprepas') === '1') {
+            Module.arguments.push('+set', 'r_depthPrepass', '0');
+            ENV.KB_NOPREPASS = '1';   // GL layer remaps lit-pass EQUAL depth test -> LEQUAL
+          }
+          // ?lowdetail=1: cut FRONTEND scene-processing cost (the proven bottleneck — GL
+          // batching gave ~0 fps, so the limiter is the engine producing the scene, not
+          // drawing it). r_worldLod default 0 *forces world geometry to highest detail*;
+          // setting it 1 enables distance LOD so the ~2800 distant world surfaces in dense
+          // scenes process/upload less. r_lodScale* >1 reduces model detail at distance.
+          if (q.get('lowdetail') === '1') {
+            Module.arguments.push('+set', 'r_worldLod', '1');
+            Module.arguments.push('+set', 'r_lodScaleRigid', '4');
+            Module.arguments.push('+set', 'r_lodScaleSkinned', '4');
+            Module.arguments.push('+set', 'r_lodBiasRigid', '2');
+            Module.arguments.push('+set', 'r_lodBiasSkinned', '2');
+          }
+          // ?nofloatz=1: skip the Float-Z depth pre-pass (a 2nd full geometry pass the GL
+          // shim always runs because supportsIntZ=0 — NOT gated by r_depthPrepass). Big draw
+          // cut; may glitch depth-based effects (soft particles/fog/DOF). No black screen.
+          if (q.get('nofloatz') === '1') ENV.KB_NOFLOATZ = '1';
+          // DOF (the ADS blur) is broken on the GL post-FX path — its multi-pass downsample/blur/
+          // depth-combine renders garbage (upside-down sliver + smeared single color), making ADS
+          // unusable. DEFAULT IT OFF so ADS is a clean zoom; ?dof=1 re-enables it (to test a future
+          // GL DOF fix). ?nodof=1 also accepted for explicitness.
+          if (q.get('dof') !== '1' || q.get('nodof') === '1')
+            Module.arguments.push('+set', 'r_dof_enable', '0');
+          // ?nodistort=1: disable the distortion/refraction pass (scope/heat-haze full-screen warp).
+          if (q.get('nodistort') === '1') Module.arguments.push('+set', 'r_distortion', '0');
+          // ?nogpusync=1: r_gpuSync off. Default ("adaptive") spin-waits on a GPU fence at the END
+          // of every frame (R_FinishGpuFence) — on the proxied build each poll is a glClientWaitSync
+          // round-trip to the DOM thread, and the wait SERIALIZES backend command production with
+          // the DOM thread draining + GPU finishing this frame. Off lets them overlap (it's a mouse-
+          // latency tweak, not correctness). Watch for hitches at spawn (CPU outrunning the GPU).
+          // r_gpuSync DEFAULT ON on web. Once the blit patch (kb_blit_patch.js) made the present
+          // cheap, leaving the fence OFF let the render thread buffer 2-3 frames ahead -> higher
+          // fps numbers but laggier feel + 100% CPU spin (fans). The fence bounds latency to ~1
+          // frame (low lag, less heat) for a tiny fps cost — the better experience. ?nogpusync=1
+          // (or ?gpusync=0) restores the unbounded-ahead max-fps mode.
+          if (q.get('nogpusync') === '1' || q.get('gpusync') === '0')
+            Module.arguments.push('+set', 'r_gpuSync', '0');
+          // ?fps=N: com_maxfps cap. A fixed cap paces every frame to the same interval (smoothest,
+          // esp. matched to the display refresh) and bounds how far the render thread runs ahead
+          // (latency + CPU/fans). Try 60/120/144. Default 85.
+          { var fc = q.get('fps'); if (fc && /^\d+$/.test(fc)) Module.arguments.push('+set', 'com_maxfps', fc); }
+          // Full-resolution textures DEFAULT ON (user-measured: same fps, sharper). r_picmip_manual
+          // 0 (auto) lets the engine downsample based on detected VRAM, which it can't read on web,
+          // so it picks a conservative low-res level. manual=1 + all picmip 0 = full res. Set before
+          // images load. Uses more memory; ?nohires=1 reverts if a heavy map nears the 2GB wasm cap.
+          if (q.get('nohires') !== '1') {
+            Module.arguments.push('+set', 'r_picmip_manual', '1', '+set', 'r_picmip', '0',
+              '+set', 'r_picmip_bump', '0', '+set', 'r_picmip_spec', '0', '+set', 'r_picmip_water', '0');
+          }
+          // Specular-intensity bisect (ISSUES.txt "spec INTENSITY too high on SOME surfaces"):
+          // the engine's own override replaces every material's envMapParms globally.
+          // NOTE r_envMapSpecular is registered but NEVER CONSUMED in this decompile — the
+          // real kill switch is the override with ~zero intensities (max must stay >0: the
+          // engine asserts r_envMapMaxIntensity > 0).
+          //   ?nospec=1     -> envmap term forced to ~0 (is the envmap path the culprit at all?)
+          //   ?envmax=N     -> r_envMapOverride with max intensity N (try 0.5, 0.25)
+          //   ?envexp=N     -> override exponent (with ?envmax)
+          if (q.get('nospec') === '1')
+            Module.arguments.push('+set', 'r_envMapOverride', '1',
+              '+set', 'r_envMapMinIntensity', '0', '+set', 'r_envMapMaxIntensity', '0.0001',
+              '+set', 'r_envMapSunIntensity', '0');
+          { var em = q.get('envmax');
+            if (em && /^[\d.]+$/.test(em)) {
+              Module.arguments.push('+set', 'r_envMapOverride', '1', '+set', 'r_envMapMaxIntensity', em);
+              var ee = q.get('envexp');
+              if (ee && /^[\d.]+$/.test(ee)) Module.arguments.push('+set', 'r_envMapExponent', ee);
+            } }
+          if (q.get('perfms') === '1')   ENV.KB_PERFMS = '1';    // [perf/ms] frame split
+          if (q.has('perflog'))          ENV.KB_PERFLOG = '1';   // enable ALL periodic diagnostics ([perf/*], [heartbeat]); default = quiet console
+          if (q.has('kbprof'))           ENV.KB_KBPROF = '1';   // [kbprof] per-thread self-time profiler (parse on main thread; workers can't see location.search)
+          if (q.get('kbspec') === '1')   ENV.KB_KBSPEC = '1';   // [kbspec] envMapParms forensics (mirror-surfaces hunt)
+          if (q.get('envclamp'))         ENV.KB_ENVCLAMP = q.get('envclamp'); // WORKING reflection dimmer: scales LOCAL envMapParms min/max (try 0.3)
+          // The toggles below run on WORKER threads, whose location.search is the worker-script
+          // URL (no page query string). Parse on the main thread here -> ENV -> getenv() on the
+          // worker, same as KB_PERFMS / KB_KBPROF. (Reading location.search on the worker is a no-op.)
+          if (q.has('nomdraw'))          ENV.KB_NOMDRAW = '1';       // disable multi-draw batching
+          if (q.has('withprepass'))      ENV.KB_WITHPREPASS = '1';   // restore the two-pass depth prepass
+          if (q.has('noslopebias'))      ENV.KB_NOSLOPEBIAS = '1';   // drop slope-scaled depth-bias caps (A/B)
+          if (q.has('manualpresent'))    ENV.KB_MANUALPRESENT = '1'; // legacy transferToImageBitmap present
+          if (q.get('rscale'))           ENV.KB_RSCALE = q.get('rscale'); // scene render-scale N (0<N<1)
+          if (q.has('worldmerge'))       ENV.KB_WORLDMERGE = '1';    // merge world draws per firstVertex-run (B, opt-in)
+          if (q.has('worldmerge2'))      ENV.KB_WORLDMERGE2 = '1';   // DEEP merge: one multi-draw across firstVertex (now DEFAULT)
+          if (q.has('noworldmerge'))     ENV.KB_NOWORLDMERGE = '1';  // disable the default world multi-draw merge (escape hatch)
+          if (q.has('nomatsort'))        ENV.KB_NOMATSORT = '1';     // restore light-first opaque drawsurf sort (escape hatch)
+          if (q.has('vbarena'))          ENV.KB_VBARENA = '1';       // static-geometry buffer arena (now DEFAULT; needs basevtx ext)
+          if (q.has('novbarena'))        ENV.KB_NOVBARENA = '1';     // disable the arena (escape hatch)
+          if (q.has('nosminst'))         ENV.KB_NOSMINST = '1';      // disable the smodel instanced fast path (escape hatch)
+          if (q.has('nolitmerge'))       ENV.KB_NOLITMERGE = '1';    // disable the lit-world multi-draw merge (escape hatch)
+          if (q.get('wmtier'))           ENV.KB_WMTIER = q.get('wmtier'); // world-merge submit tier A/B: 0=multidraw 1=per-entry-bv 2=cpu-merge
+          if (q.has('nomatarray'))       ENV.KB_MATARRAY = '0';   // escape: disable material texture-array consolidation (default is parity ON)
+          if (q.get('matarray'))         ENV.KB_MATARRAY = q.get('matarray');   // override level: 1=build-only, 2=parity (default), 3=parity+per-instance-layer+setup-skip
+          if (q.has('noskip'))           ENV.KB_NOSKIP = '1';        // bisect: at level 3, disable the 3b stable-args setup-skip (keep step-1 instanced layer)
+          if (q.get('matcap'))           ENV.KB_MATCAP = q.get('matcap');   // matarray GPU-mem budget MB (default 320); greedy builds biggest buckets up to it
+          if (q.has('nomodelmat'))       ENV.KB_MODELMAT = '0';      // escape: disable model-material texture-array consolidation (default ON — cuts model texture-rebind batch breaks)
+          if (q.get('modelmat'))         ENV.KB_MODELMAT = q.get('modelmat');   // override: 0=off, 1=on (default)
+          if (q.has('smcachefold'))      ENV.KB_SMCACHEFOLD = '1';   // opt-in: fold smodel-cache stream offset to baseVertex (cuts vtx batch breaks; needs baseVertex ext / loc=1)
+          if (q.get('rigidvb') === '1')  ENV.KB_RIGIDVB = '1';        // rigid props: bind static vb0/IB instead of per-frame vertex memcpy (kills the tess-invoke cost)
+          if (q.has('lmarray'))          ENV.KB_LMARRAY = '1';       // lit-world lightmap texture array (stage 1 parity test)
+          if (q.get('nosnd') === '1')    ENV.KB_NOSND = '1';     // headless: no audio device
+          if (q.get('mips') === '1')     ENV.KB_MIPS = '1';      // re-enable cube GenerateMipmap (wedges ANGLE-GL)
+          if (q.get('novao') === '1')    ENV.KB_NOVAO = '1';     // bypass VAO cache (bisect)
+          if (q.get('dumpskin') === '1') ENV.KB_DUMPSKIN = '1';  // [kbskin] dump skinned vertex decls (M16 spazz)
+          if (q.get('drawcomp') === '1') ENV.KB_DRAWCOMP = '1';  // [perf/comp] instanceable-vs-unique draw histogram
+          // GPU instancing of consecutive same-geometry draws (one glDrawElementsInstanced per
+          // run; matrix via instanced attributes). DEFAULT ON (=2, measured ~+33% dense, clean,
+          // reorders nothing). ?inst=1 = validate (per-instance normal render); ?noinst / ?inst=0
+          // = off (fallback if any prop misplacement ever shows up).
+          { var iv = q.get('inst'); if (q.get('noinst') === '1') iv = '0';
+            ENV.KB_INST = (iv === '0' || iv === '1' || iv === '2') ? iv : '2'; }
+          var rm = q.get('rmode') || ((q.has('mobile') || matchMedia('(pointer: coarse)').matches) ? '960x540' : null);                               // ?rmode=640x480
+          if (rm && /^\d+x\d+$/.test(rm)) Module.arguments.push('+set', 'r_mode', rm);
+        } catch (e) {}
+        try {
+          var mk = (p) => { try { FS.mkdirTree(p); } catch (e) {} };
+          mk('/tmp');                       // (runtime already makes it; harmless)
+          mk('/home/web_user');             // $HOME (userDocuments base)
+          mk('/home/web_user/Activision/CoD');   // FS_GetOsFolderPath(CSIDL_*) target
+          mk('/main');                      // fs_homepath=/ + gamedir "main" (logs/config)
+          mk('/players');                   // FS_FOpenFileWriteToDir(..,"players",..)
+          mk('/screenshots');               // screenshot writes
+        } catch (e) { console.warn('[KBFS] preRun mkdir failed', e); }
+      }],
+    };
+  </script>
+
+  <!--
+    Deadlock-free input bridge for the MT build. The engine's render worker proxies
+    every GL call to this DOM thread, so the game worker must NOT make synchronous DOM
+    calls (registering listeners from the worker deadlocks). Instead these listeners run
+    natively here on the DOM thread and write input into a shared int32 block in WASM
+    memory (a SharedArrayBuffer); the game worker only reads it. The C side calls
+    KBInputSetup(base, fbW, fbH) once (via MAIN_THREAD_ASYNC_EM_ASM). Layout / packing
+    must match src/platform/sdl/sdl_events.cpp (KBI_* and the ring-entry encoding).
+  -->
+  <script>
+    window.KBInputSetup = function (base, fbW, fbH) {
+      const KBI_MX = 0, KBI_MY = 1, KBI_DX = 2, KBI_DY = 3, KBI_HEAD = 4;
+      const KBI_RING = 8, KBI_RINGSZ = 256;
+      // base is a byte offset; the shared buffer is not detached on growth (pthreads),
+      // and the block lives in fixed low static data, so this view stays valid.
+      const V = new Int32Array(Module.HEAPU8.buffer, base, KBI_RING + KBI_RINGSZ);
+      const canvas = document.getElementById('canvas');
+
+      function push(kind, down, value) {
+        const h = Atomics.load(V, KBI_HEAD);
+        V[KBI_RING + (h & (KBI_RINGSZ - 1))] =
+          ((kind & 0xFF) << 24) | ((down & 1) << 16) | (value & 0xFFFF);
+        Atomics.store(V, KBI_HEAD, h + 1);   // publish (release) the entry above
+      }
+      function setPos(e) {
+        const r = canvas.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          Atomics.store(V, KBI_MX, ((e.clientX - r.left) * fbW / r.width) | 0);
+          Atomics.store(V, KBI_MY, ((e.clientY - r.top) * fbH / r.height) | 0);
+        }
+      }
+      // Stop scroll/tab-navigation for keys the game consumes; leave Ctrl/Cmd/Alt and
+      // F-keys (reload/devtools) alone for the developer.
+      function maybePD(e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const kc = e.keyCode;
+        if (kc === 9 || kc === 32 || (kc >= 33 && kc <= 40)) e.preventDefault();
+      }
+
+      window.addEventListener('keydown', function (e) {
+        push(0 /*KEY*/, 1, e.keyCode);
+        if (e.key && e.key.length === 1) {
+          const c = e.key.charCodeAt(0);
+          if (c >= 0x20 && c < 0x7F) push(1 /*CHAR*/, 0, c);
+        }
+        maybePD(e);
+      });
+      window.addEventListener('keyup', function (e) { push(0 /*KEY*/, 0, e.keyCode); maybePD(e); });
+      canvas.addEventListener('mousemove', function (e) {
+        setPos(e);
+        Atomics.add(V, KBI_DX, e.movementX | 0);
+        Atomics.add(V, KBI_DY, e.movementY | 0);
+      });
+      canvas.addEventListener('mousedown', function (e) { setPos(e); push(2 /*MBTN*/, 1, e.button); e.preventDefault(); });
+      canvas.addEventListener('mouseup',   function (e) { setPos(e); push(2 /*MBTN*/, 0, e.button); e.preventDefault(); });
+      canvas.addEventListener('wheel',      function (e) { push(3 /*WHEEL*/, e.deltaY < 0 ? 1 : 0, 0); e.preventDefault(); }, { passive: false });
+      canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      console.log('[KBInput] listeners wired (' + fbW + 'x' + fbH + ')');
+    };
+  </script>
+
+  <script src="web_fs.js"></script>
+  <script src="engine-loader.js"></script>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    function setStatus(t) { statusEl.textContent = t; }
+
+    let kbEngineStarted = false;
+    function startEngine() {
+      // Re-entry guard: a second callMain mid-run re-executes the boot path on top of the
+      // live game (duplicated argv, trashed fastfile state -> "Couldn't find the bsp").
+      // Seen when a stray Enter re-activates the still-focused #pick button.
+      if (kbEngineStarted) { console.warn('[KB] startEngine ignored (already started)'); return; }
+      kbEngineStarted = true;
+      setStatus("starting engine…");
+      // Module.run() is provided by blackops.js once the runtime is initialized.
+      const launch = () => {
+        if (document.documentElement.classList.contains("mobile")) Module._KBMobile_Enable?.(1);
+        Module.callMain(Module.arguments);
+      };
+      if (Module.calledRun) launch();
+      else { Module.onRuntimeInitialized = launch; }
+    }
+
+    document.getElementById('pick').addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      if (btn.disabled) return;
+      try {
+        setStatus("select your Steam \"Call of Duty Black Ops\" folder…");
+        // pickFolder() uses showDirectoryPicker() on a secure context (https/
+        // localhost) and falls back to <input webkitdirectory> over plain HTTP/LAN.
+        const n = await Module.KBFS.pickFolder();
+        setStatus(`granted: ${n} files indexed. booting…`);
+        btn.disabled = true; btn.blur();   // Enter must never re-trigger the pick/boot
+        startEngine();
+      } catch (e) { console.error(e); setStatus("folder pick cancelled/failed: " + e.message); }
+    });
+
+    // Fake-file smoke FS: replaces KBFS with a tiny in-memory provider so the
+    // sync bridge (open/size/pread/close + Asyncify) can be exercised end-to-end
+    // without a real Steam install. It serves one zero-filled file of a chosen
+    // size for ANY requested path, so you can confirm the read path round-trips.
+    document.getElementById('fake').addEventListener('change', (ev) => {
+      if (!ev.target.checked) return;
+      const FAKE_SIZE = 64 * 1024; // 64 KB synthetic file
+      Module.KBFS = {
+        ready: true,
+        _open: new Map(), _id: 1,
+        exists() { return 1; },
+        async open() { const id = this._id++; this._open.set(id, 0); return id; },
+        async size() { return FAKE_SIZE; },
+        async pread(id, offset, len) {
+          const end = Math.min(offset + len, FAKE_SIZE);
+          if (end <= offset) return new Uint8Array(0);
+          return new Uint8Array(end - offset); // zero-filled
+        },
+        close(id) { this._open.delete(id); },
+      };
+      setStatus("fake-file smoke FS enabled. booting…");
+      startEngine();
+    });
+  </script>
+  <script src="mobile-keys.js"></script>
+  <script src="mobile-ui.js"></script>
+</body>
+</html>

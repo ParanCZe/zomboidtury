@@ -1,0 +1,442 @@
+diff --git a/cmake/portable.cmake b/cmake/portable.cmake
+index 93e75f4..72e0bad 100644
+--- a/cmake/portable.cmake
++++ b/cmake/portable.cmake
+@@ -152,6 +152,11 @@ if (EMSCRIPTEN)
+     )
+ 
+     add_custom_command(TARGET ${BIN_NAME} POST_BUILD
++        COMMAND ${CMAKE_COMMAND} -E copy_if_different
++            "${SRC_DIR}/platform/web/mobile-keys.js"
++            "${SRC_DIR}/platform/web/mobile-ui.js"
++            "${SRC_DIR}/platform/web/mobile.css"
++            "$<TARGET_FILE_DIR:${BIN_NAME}>"
+         COMMAND ${CMAKE_COMMAND} -E copy_if_different
+             "${SRC_DIR}/platform/web/index.html"
+             "$<TARGET_FILE_DIR:${BIN_NAME}>/index.html"
+diff --git a/src/database/db_auth.cpp b/src/database/db_auth.cpp
+index f5787ef..987a0f1 100644
+--- a/src/database/db_auth.cpp
++++ b/src/database/db_auth.cpp
+@@ -2,8 +2,13 @@
+ #include <universal/assertive.h>
+ #include <qcommon/common.h>
+ 
+-int __cdecl DB_AuthLoad_InflateInit(z_stream_s *stream, bool isSecure)
++static z_stream_s *rawStream = nullptr;
++int DB_RawInflate(z_stream_s *stream);
++
++int __cdecl DB_AuthLoad_InflateInit(z_stream_s *stream, bool isSecure, bool isRaw)
+ {
++    rawStream = isRaw ? stream : nullptr;
++    if (isRaw) { stream->total_in = stream->total_out = 0; return Z_OK; }
+     if ( isSecure
+         && !Assert_MyHandler("C:\\projects_pc\\cod\\codsrc\\src\\database\\db_auth.cpp", 944, 0, "%s", "!isSecure") )
+     {
+@@ -14,11 +19,13 @@ int __cdecl DB_AuthLoad_InflateInit(z_stream_s *stream, bool isSecure)
+ 
+ void __cdecl DB_AuthLoad_InflateEnd(z_stream_s *stream)
+ {
++    if (stream == rawStream) { rawStream = nullptr; return; }
+     inflateEnd(stream);
+ }
+ 
+ int __cdecl DB_AuthLoad_Inflate(z_stream_s *stream, int flush)
+ {
++    if (stream == rawStream) return DB_RawInflate(stream);
+     return inflate(stream, flush);
+ }
+ 
+diff --git a/src/database/db_auth.h b/src/database/db_auth.h
+index 0818777..b6358d4 100644
+--- a/src/database/db_auth.h
++++ b/src/database/db_auth.h
+@@ -2,7 +2,7 @@
+ 
+ #include <zlib/zlib.h>
+ 
+-int __cdecl DB_AuthLoad_InflateInit(z_stream_s *stream, bool isSecure);
++int __cdecl DB_AuthLoad_InflateInit(z_stream_s *stream, bool isSecure, bool isRaw = false);
+ void __cdecl DB_AuthLoad_InflateEnd(z_stream_s *stream);
+ int __cdecl DB_AuthLoad_Inflate(z_stream_s *stream, int flush);
+ void *__cdecl tom_game_malloc(unsigned int size);
+diff --git a/src/database/db_file_load.cpp b/src/database/db_file_load.cpp
+index 4696873..79c6b69 100644
+--- a/src/database/db_file_load.cpp
++++ b/src/database/db_file_load.cpp
+@@ -397,7 +397,7 @@ void __cdecl DB_LoadXFileInternal()
+     *(unsigned int *)&magic[4] = *((unsigned int *)g_load.stream.next_in + 1);
+     g_load.stream.next_in += 8;
+     g_load.stream.avail_in -= 8;
+-    if ( memcmp(magic, "IWff0100", 8u) && memcmp(magic, "IWffu100", 8u) )
++    if ( memcmp(magic, "IWff0100", 8u) && memcmp(magic, "IWffu100", 8u) && memcmp(magic, "IWffr100", 8u) )
+     {
+         //BLOPS_NULLSUB();
+         Com_Error(ERR_DROP, "Fastfile for zone '%s' is corrupt or unreadable.", g_load.filename);
+@@ -432,8 +432,9 @@ void __cdecl DB_LoadXFileInternal()
+                 version,
+                 473);
+     }
+-    fileIsSecure = memcmp(magic, "IWffu100", 8u) != 0;
+-    err = DB_AuthLoad_InflateInit(&g_load.stream, fileIsSecure);
++    const bool fileIsRaw = memcmp(magic, "IWffr100", 8u) == 0;
++    fileIsSecure = !fileIsRaw && memcmp(magic, "IWffu100", 8u) != 0;
++    err = DB_AuthLoad_InflateInit(&g_load.stream, fileIsSecure, fileIsRaw);
+     failureReason = 0;
+     if ( fileIsSecure )
+         failureReason = "authenticated file not supported";
+diff --git a/src/database/db_raw.cpp b/src/database/db_raw.cpp
+new file mode 100644
+index 0000000..fee1615
+--- /dev/null
++++ b/src/database/db_raw.cpp
+@@ -0,0 +1,19 @@
++#include <zlib/zlib.h>
++#include <algorithm>
++#include <cstring>
++
++// IWffr100 stores the XFile header and payload verbatim after magic/version.
++int DB_RawInflate(z_stream_s *stream)
++{
++    const unsigned count = std::min(stream->avail_in, stream->avail_out);
++    if (count) {
++        std::memcpy(stream->next_out, stream->next_in, count);
++        stream->next_in += count;
++        stream->next_out += count;
++        stream->avail_in -= count;
++        stream->avail_out -= count;
++        stream->total_in += count;
++        stream->total_out += count;
++    }
++    return Z_OK;
++}
+diff --git a/src/platform/linux/sys_platform.cpp b/src/platform/linux/sys_platform.cpp
+index dd73208..0796fa6 100644
+--- a/src/platform/linux/sys_platform.cpp
++++ b/src/platform/linux/sys_platform.cpp
+@@ -152,6 +152,10 @@ void Sys_LoadingKeepAlive() { Sys_PumpSDLEvents(Sys_Milliseconds()); }
+ // otherwise; its return value (recenterMouse) requests relative/captured mode,
+ // which maps cleanly to SDL's relative mouse mode.
+ void IN_Frame() {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    extern bool KBMobile_Frame();
++    if (KBMobile_Frame()) return;
++#endif
+ #if defined(__EMSCRIPTEN_PTHREADS__)
+     // Web has no SDL window; mouse comes from the shared input block. Menu uses the
+     // absolute (scaled) cursor; in-game look uses Pointer Lock movement deltas.
+diff --git a/src/platform/sdl/mobile_input.cpp b/src/platform/sdl/mobile_input.cpp
+new file mode 100644
+index 0000000..5aaccac
+--- /dev/null
++++ b/src/platform/sdl/mobile_input.cpp
+@@ -0,0 +1,47 @@
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include "mobile_motion.h"
++#include "sdl_events.h"
++#include <ui/keycodes.h>
++#include <win32/win_local.h>
++#include <emscripten/emscripten.h>
++#include <algorithm>
++#include <array>
++
++void Sys_QueEvent(unsigned int, sysEventType_t, int, int, int, void *);
++int CL_MouseEvent(int x, int y, int dx, int dy);
++static bool enabled = false;
++static KBMobileMotion motion;
++static int pointerX = 0, pointerY = 0;
++static std::array<bool, 256> held{};
++
++extern "C" {
++EMSCRIPTEN_KEEPALIVE void KBMobile_Reset() {
++    for (int k=0; k<256; ++k) if (held[k]) {
++        Sys_QueEvent(0, SE_KEY, k, 0, 0, nullptr); held[k] = false;
++    }
++    motion.clear();
++}
++EMSCRIPTEN_KEEPALIVE void KBMobile_Enable(int value) {
++    KBMobile_Reset(); enabled = value != 0;
++}
++EMSCRIPTEN_KEEPALIVE void KBMobile_Key(int sdlKey, int down) {
++    if (!enabled) return;
++    int k = sdlKey == -1 ? K_MOUSE1 : sdlKey == -2 ? K_MOUSE2 : Sys_SDLKeyToKeyNum(sdlKey);
++    if (k<=0 || k>=256 || held[k] == (down != 0)) return;
++    held[k] = down != 0;
++    Sys_QueEvent(0, SE_KEY, k, down != 0, 0, nullptr);
++}
++EMSCRIPTEN_KEEPALIVE void KBMobile_Look(double dx, double dy) {
++    if (enabled) motion.add(dx,dy);
++}
++EMSCRIPTEN_KEEPALIVE void KBMobile_Pointer(int x, int y) {
++    pointerX = std::clamp(x,0,8192); pointerY = std::clamp(y,0,8192);
++}
++}
++bool KBMobile_Frame() {
++    if (!enabled) return false;
++    int dx,dy; motion.consume(dx,dy);
++    CL_MouseEvent(pointerX,pointerY,dx,dy);
++    return true;
++}
++#endif
+diff --git a/src/platform/sdl/mobile_motion.cpp b/src/platform/sdl/mobile_motion.cpp
+new file mode 100644
+index 0000000..f6cf798
+--- /dev/null
++++ b/src/platform/sdl/mobile_motion.cpp
+@@ -0,0 +1,13 @@
++#include "mobile_motion.h"
++#include <cmath>
++#include <algorithm>
++
++void KBMobileMotion::add(double dx, double dy) {
++    if (std::isfinite(dx)) x = std::clamp(x + dx, -4096.0, 4096.0);
++    if (std::isfinite(dy)) y = std::clamp(y + dy, -4096.0, 4096.0);
++}
++void KBMobileMotion::consume(int &dx, int &dy) {
++    dx = static_cast<int>(x); dy = static_cast<int>(y);
++    x -= dx; y -= dy;
++}
++void KBMobileMotion::clear() { x = y = 0; }
+diff --git a/src/platform/sdl/mobile_motion.h b/src/platform/sdl/mobile_motion.h
+new file mode 100644
+index 0000000..0bcadc0
+--- /dev/null
++++ b/src/platform/sdl/mobile_motion.h
+@@ -0,0 +1,8 @@
++#pragma once
++
++struct KBMobileMotion {
++    double x = 0, y = 0;
++    void add(double dx, double dy);
++    void consume(int &dx, int &dy);
++    void clear();
++};
+diff --git a/src/platform/web/index.html b/src/platform/web/index.html
+index bd22970..74478cf 100644
+--- a/src/platform/web/index.html
++++ b/src/platform/web/index.html
+@@ -24,7 +24,13 @@
+ <title>KisakBlack (WebGL2)</title>
+ <!-- GitHub Pages cannot set COOP/COEP response headers. This service worker
+      supplies them and reloads once so the pthread build can use SharedArrayBuffer. -->
+-<script src="coi-serviceworker.js"></script>
++<script>
++  // The experimental mobile build is single-threaded and needs no isolation worker.
++  if (!new URLSearchParams(location.search).has('mobile') && !matchMedia('(pointer: coarse)').matches) {
++    const workerScript = document.createElement('script');
++    workerScript.src = 'coi-serviceworker.js'; document.head.append(workerScript);
++  }
++</script>
+ <style>
+   body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
+   #bar { padding: 8px 12px; background: #1c1c1c; display: flex; gap: 12px; align-items: center; }
+@@ -303,7 +309,7 @@
+           // = off (fallback if any prop misplacement ever shows up).
+           { var iv = q.get('inst'); if (q.get('noinst') === '1') iv = '0';
+             ENV.KB_INST = (iv === '0' || iv === '1' || iv === '2') ? iv : '2'; }
+-          var rm = q.get('rmode');                               // ?rmode=640x480
++          var rm = q.get('rmode') || ((q.has('mobile') || matchMedia('(pointer: coarse)').matches) ? '960x540' : null);                               // ?rmode=640x480
+           if (rm && /^\d+x\d+$/.test(rm)) Module.arguments.push('+set', 'r_mode', rm);
+         } catch (e) {}
+         try {
+@@ -396,8 +402,12 @@
+       kbEngineStarted = true;
+       setStatus("starting engine…");
+       // Module.run() is provided by blackops.js once the runtime is initialized.
+-      if (Module.calledRun) { Module.callMain(Module.arguments); }
+-      else { Module.onRuntimeInitialized = () => Module.callMain(Module.arguments); }
++      const launch = () => {
++        if (document.documentElement.classList.contains("mobile")) Module._KBMobile_Enable?.(1);
++        Module.callMain(Module.arguments);
++      };
++      if (Module.calledRun) launch();
++      else { Module.onRuntimeInitialized = launch; }
+     }
+ 
+     document.getElementById('pick').addEventListener('click', async (ev) => {
+@@ -438,5 +448,7 @@
+       startEngine();
+     });
+   </script>
++  <script src="mobile-keys.js"></script>
++  <script src="mobile-ui.js"></script>
+ </body>
+ </html>
+diff --git a/src/platform/web/mobile-keys.js b/src/platform/web/mobile-keys.js
+new file mode 100644
+index 0000000..d2d954f
+--- /dev/null
++++ b/src/platform/web/mobile-keys.js
+@@ -0,0 +1,15 @@
++(function(root) {
++  class KeyOwners {
++    constructor(send) { this.send=send; this.sources=new Map(); }
++    set(source, values) {
++      const before=new Set([...this.sources.values()].flatMap(s=>[...s]));
++      if(values.length) this.sources.set(source,new Set(values)); else this.sources.delete(source);
++      const after=new Set([...this.sources.values()].flatMap(s=>[...s]));
++      for(const key of before) if(!after.has(key)) this.send(key,false);
++      for(const key of after) if(!before.has(key)) this.send(key,true);
++    }
++    clear() { for(const key of new Set([...this.sources.values()].flatMap(s=>[...s]))) this.send(key,false); this.sources.clear(); }
++  }
++  if(typeof module==='object' && module.exports) module.exports={KeyOwners};
++  else root.KBMobileKeys={KeyOwners};
++})(typeof window==='object'?window:globalThis);
+diff --git a/src/platform/web/mobile-ui.js b/src/platform/web/mobile-ui.js
+new file mode 100644
+index 0000000..dcf206d
+--- /dev/null
++++ b/src/platform/web/mobile-ui.js
+@@ -0,0 +1,74 @@
++(function() {
++  if(!new URLSearchParams(location.search).has('mobile') && !matchMedia('(pointer: coarse)').matches) return;
++  document.documentElement.classList.add('mobile');
++  const style=document.createElement('link');style.rel='stylesheet';style.href='mobile.css';document.head.append(style);
++  const viewport=document.createElement('meta');viewport.name='viewport';viewport.content='width=device-width, initial-scale=1, viewport-fit=cover';document.head.append(viewport);
++  const canvas=document.getElementById('canvas');
++  const pick=document.getElementById('pick');pick.textContent='Načíst herní soubory';
++  const panel=document.createElement('div');panel.id='mobile-controls';
++  panel.innerHTML='<div id="move-pad"><span></span></div><div id="look-pad"></div><div id="mobile-actions">'+
++    '<button data-key="-1">STŘELBA</button><button data-key="-2">MÍŘENÍ</button>'+
++    '<button data-key="114">PŘEBÍT</button><button data-key="102">POUŽÍT</button>'+
++    '<button data-key="32">SKOK</button><button data-key="99">DŘEP</button>'+
++    '<button data-key="1073742049">BĚH</button><button data-key="49">ZBRAŇ 1</button>'+
++    '<button data-key="50">ZBRAŇ 2</button><button data-key="27">MENU</button>'+
++    '</div><div id="mobile-rotate">Otoč telefon na šířku</div>';
++  document.body.append(panel);
++  const info=document.createElement('p');info.id='mobile-info';
++  info.textContent='Testovací mobilní build. Načti vlastní originální herní soubory. Kino ani běh na iPhonu zatím nejsou ověřené.';
++  pick.parentElement.append(info);
++  const keys=new KBMobileKeys.KeyOwners((key,down)=> {if(Module._KBMobile_Key) Module._KBMobile_Key(key,Number(down));});
++  let motionPointer=null, movePointer=null, previous=null, lookStart=null;
++  const buttonHolds=[];
++  const reset=()=>{buttonHolds.forEach(held=>held.clear());panel.querySelectorAll("button.active").forEach(btn=>btn.classList.remove("active"));keys.clear();motionPointer=movePointer=null;previous=null;lookStart=null; if(Module._KBMobile_Reset) Module._KBMobile_Reset();panel.querySelector('#move-pad span').style.transform='translate(0,0)';};
++  window.addEventListener('blur',reset);window.addEventListener('pagehide',reset);
++  document.addEventListener('visibilitychange',()=>{if(document.hidden)reset();});
++  const init=()=>{Module._KBMobile_Enable(1);};
++  if(Module.calledRun) init(); else {const old=Module.onRuntimeInitialized;Module.onRuntimeInitialized=()=>{old?.();init();};}
++  const move=panel.querySelector('#move-pad');const thumb=move.querySelector('span');
++  function updateMove(e) {
++    const r=move.getBoundingClientRect(), x=(e.clientX-r.left-r.width/2)/(r.width/2), y=(e.clientY-r.top-r.height/2)/(r.height/2);
++    const v=[];if(x<-.22)v.push(97);if(x>.22)v.push(100);if(y<-.22)v.push(119);if(y>.22)v.push(115);
++    keys.set('move',v);const n=Math.max(1,Math.hypot(x,y));thumb.style.transform=`translate(${x/n*35}px,${y/n*35}px)`;
++  }
++  move.onpointerdown=e=>{if(movePointer!==null)return;e.preventDefault();movePointer=e.pointerId;move.setPointerCapture(e.pointerId);updateMove(e);};
++  move.onpointermove=e=>{if(e.pointerId===movePointer)updateMove(e);};
++  const stopMove=e=>{if(e.pointerId!==movePointer)return;movePointer=null;keys.set('move',[]);thumb.style.transform='translate(0,0)';};
++  move.onpointerup=move.onpointercancel=move.onlostpointercapture=stopMove;
++  const look=panel.querySelector('#look-pad');
++  function position(e) { const r=canvas.getBoundingClientRect(); if(r.width && r.height)Module._KBMobile_Pointer?.(Math.round((e.clientX-r.left)*canvas.width/r.width),Math.round((e.clientY-r.top)*canvas.height/r.height)); }
++  look.onpointerdown=e=>{if(motionPointer!==null)return;e.preventDefault();motionPointer=e.pointerId;previous=[e.clientX,e.clientY];lookStart=[e.clientX,e.clientY,performance.now()];look.setPointerCapture(e.pointerId);position(e);};
++  look.onpointermove=e=>{if(e.pointerId!==motionPointer||!previous)return;position(e);Module._KBMobile_Look?.((e.clientX-previous[0])*.8,(e.clientY-previous[1])*.8);previous=[e.clientX,e.clientY];};
++  const stopLook=e=>{if(e.pointerId!==motionPointer)return;
++    if(e.type==='pointerup' && lookStart && performance.now()-lookStart[2]<250 && Math.hypot(e.clientX-lookStart[0],e.clientY-lookStart[1])<8) {
++      const source='tap:'+e.pointerId;keys.set(source,[-1]);setTimeout(()=>keys.set(source,[]),80);
++    }
++    motionPointer=null;previous=lookStart=null;
++  };
++  look.onpointerup=look.onpointercancel=look.onlostpointercapture=stopLook;
++  for(const btn of panel.querySelectorAll('button')) {
++    const held=new Set();buttonHolds.push(held);
++    btn.onpointerdown=e=>{e.preventDefault();btn.setPointerCapture(e.pointerId);held.add(e.pointerId);keys.set('button:'+e.pointerId,[Number(btn.dataset.key)]);btn.classList.add('active');};
++    const release=e=>{keys.set('button:'+e.pointerId,[]);held.delete(e.pointerId);if(!held.size)btn.classList.remove('active');};
++    btn.onpointerup=btn.onpointercancel=btn.onlostpointercapture=release;
++  }
++  // Single-file selection works without the desktop Directory Picker API.
++  // Preserve directory paths if supplied; infer only standard base-game locations.
++  Module.KBFS.pickFolder=()=>new Promise((resolve,reject)=>{
++    const input=document.createElement('input');input.type='file';input.multiple=true;input.accept='.iwd,.ff,.txt,.cfg,.csv';
++    input.oncancel=()=>reject(new Error('Výběr byl zrušen.'));
++    input.onchange=()=>{
++      const fs=Module.KBFS;fs.index.clear();fs.dirs.clear();
++      for(const file of input.files) {
++        const n=file.name.toLowerCase();let path=file.webkitRelativePath;
++        if(path)path=path.split('/').slice(1).join('/');
++        else path=n.endsWith('.iwd')?'main/'+n:n.endsWith('.ff')?(n.startsWith('en_')?'zone/english/':'zone/common/')+n:n;
++        const norm=fs.norm(path);fs.index.set(norm,file);
++        const parts=norm.split('/');for(let i=1;i<parts.length;i++)fs.dirs.add(parts.slice(0,i).join('/'));
++      }
++      fs.rootName='local-game-files';fs.ready=fs.index.size>0;
++      if(fs.ready)resolve(fs.index.size);else reject(new Error('Nebyly vybrány herní soubory.'));
++    };
++    input.click();
++  });
++})();
+diff --git a/src/platform/web/mobile.css b/src/platform/web/mobile.css
+new file mode 100644
+index 0000000..1ef6434
+--- /dev/null
++++ b/src/platform/web/mobile.css
+@@ -0,0 +1,15 @@
++html.mobile,html.mobile body{margin:0;width:100%;height:100%;overflow:hidden;background:#080b10;color:#eef1f6;font-family:system-ui;-webkit-user-select:none;user-select:none}
++.mobile #canvas{position:fixed;inset:0;width:100vw!important;height:100dvh!important;object-fit:contain;touch-action:none}
++.mobile #display{position:fixed;inset:0;width:100vw!important;height:100dvh!important;object-fit:contain}
++.mobile #bar{position:relative;z-index:5;background:#101722d9;padding:10px;max-width:600px}
++.mobile #bar label,.mobile #fake{display:none}
++#mobile-controls{position:fixed;inset:0;z-index:4;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
++#move-pad{position:absolute;left:max(24px,env(safe-area-inset-left));bottom:24px;width:120px;height:120px;border:1px solid #ffffff50;border-radius:50%;background:#11182770;pointer-events:auto;touch-action:none}
++#move-pad span{display:block;position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:#ffffff80}
++#look-pad{position:absolute;left:28%;right:0;top:0;bottom:0;pointer-events:auto;touch-action:none}
++#mobile-actions{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:16px;display:grid;grid-template-columns:repeat(3,minmax(58px,1fr));gap:7px;width:260px;pointer-events:none}
++#mobile-actions button{min-height:42px;border:1px solid #ffffff45;background:#152132bd;color:white;border-radius:12px;font-size:10px;font-weight:700;touch-action:none;pointer-events:auto}
++#mobile-actions button.active{background:#61758ddd}
++#mobile-info{font-size:12px;max-width:500px;margin:6px 0}
++#mobile-rotate{display:none}
++@media(orientation:portrait){#mobile-rotate{display:flex;position:absolute;inset:0;align-items:center;justify-content:center;background:#080b10ee;font-size:22px;pointer-events:auto}#move-pad,#look-pad,#mobile-actions{display:none}}
+diff --git a/tests/mobile_keys_test.cjs b/tests/mobile_keys_test.cjs
+new file mode 100644
+index 0000000..c6a8457
+--- /dev/null
++++ b/tests/mobile_keys_test.cjs
+@@ -0,0 +1,13 @@
++const assert=require('node:assert/strict');
++const fs=require('node:fs');
++const file='../src/platform/web/mobile-keys.js';
++assert.ok(fs.existsSync(require('node:path').join(__dirname,file)), 'Mobile key ownership is not implemented');
++const {KeyOwners}=require(file);
++const events=[];const keys=new KeyOwners((key,down)=>events.push([key,down]));
++keys.set('joystick', [119]);keys.set('button', [119]);keys.set('joystick', []);
++assert.deepEqual(events,[[119,true]],'Releasing one finger must not release another finger holding the same key');
++keys.clear();assert.deepEqual(events,[[119,true],[119,false]],'Cancellation releases every held key');
++keys.set('joystick',[119,100]);keys.set('joystick',[115]);
++assert.deepEqual(events.slice(2),[[119,true],[100,true],[119,false],[100,false],[115,true]]);
++keys.clear();assert.deepEqual(events.at(-1),[115,false]);
++console.log('Mobile key cancellation and ownership: PASS');
+diff --git a/tests/mobile_motion_test.cpp b/tests/mobile_motion_test.cpp
+new file mode 100644
+index 0000000..5cf44a7
+--- /dev/null
++++ b/tests/mobile_motion_test.cpp
+@@ -0,0 +1,12 @@
++#include "../src/platform/sdl/mobile_motion.h"
++#include <cassert>
++#include <limits>
++int main() {
++    KBMobileMotion m;
++    int x, y;
++    m.add(.6, -.6); m.consume(x,y); assert(x==0 && y==0);
++    m.add(.6, -.6); m.consume(x,y); assert(x==1 && y==-1);
++    m.consume(x,y); assert(x==0 && y==0);
++    m.clear(); m.add(std::numeric_limits<double>::infinity(), 4); m.consume(x,y); assert(x==0 && y==4);
++    m.add(20,30); m.clear(); m.consume(x,y); assert(x==0 && y==0);
++}
+diff --git a/tests/raw_fastfile_test.cpp b/tests/raw_fastfile_test.cpp
+new file mode 100644
+index 0000000..cc70e38
+--- /dev/null
++++ b/tests/raw_fastfile_test.cpp
+@@ -0,0 +1,13 @@
++#include <zlib/zlib.h>
++#include <cassert>
++#include <cstring>
++int DB_RawInflate(z_stream_s *stream);
++int main() {
++    unsigned char input[]={1,2,3,4,5}, output[5]={};
++    z_stream_s s{};s.next_in=input;s.avail_in=2;s.next_out=output;s.avail_out=5;
++    assert(DB_RawInflate(&s)==Z_OK);assert(s.avail_in==0 && s.avail_out==3);
++    s.avail_in=3;assert(DB_RawInflate(&s)==Z_OK);
++    assert(s.total_in==5 && s.total_out==5 && s.avail_out==0);
++    assert(!std::memcmp(input,output,5));
++    assert(DB_RawInflate(&s)==Z_OK && s.total_in==5);
++}
