@@ -52,6 +52,34 @@
       window.addEventListener('unhandledrejection',function(e){ window.__kbShowErr('[reject] '+((e.reason&&e.reason.message)||e.reason||e)); });
     })();
   </script>
+  <details id="boot-diagnostics" style="position:relative;z-index:99998;background:#17202b;padding:8px;font-size:12px">
+    <summary>Diagnostika spuštění (při zamrznutí obnov stránku)</summary>
+    <button id="copy-boot-log" type="button">Kopírovat záznam</button>
+    <pre id="boot-log" style="max-height:30vh;overflow:auto;white-space:pre-wrap;user-select:text;-webkit-user-select:text"></pre>
+  </details>
+  <script>
+    (function () {
+      const key='kbz-boot-log-v1', box=document.getElementById('boot-log');
+      let previous=''; try { previous=localStorage.getItem(key)||''; } catch (_) {}
+      const lines=[];
+      function record(text) {
+        lines.push(new Date().toISOString()+' '+String(text).slice(0,2000));
+        if(lines.length>100)lines.shift();
+        const current=lines.join('\n');
+        box.textContent=(previous?'PŘEDCHOZÍ POKUS:\n'+previous+'\n\nAKTUÁLNÍ POKUS:\n':'')+current;
+        try { localStorage.setItem(key,current); } catch (_) {}
+      }
+      window.KBZBootLog=record;
+      record('Diagnostika v1; '+navigator.userAgent);
+      document.getElementById('copy-boot-log').onclick=async function () {
+        try { await navigator.clipboard.writeText(box.textContent); this.textContent='Zkopírováno'; }
+        catch (_) { const range=document.createRange();range.selectNodeContents(box);const selection=getSelection();selection.removeAllRanges();selection.addRange(range); }
+      };
+      addEventListener('error',e=>record('CHYBA: '+e.message));
+      addEventListener('unhandledrejection',e=>record('ODMÍTNUTO: '+String(e.reason?.stack||e.reason)));
+      document.getElementById('canvas').addEventListener('webglcontextlost',()=>record('WebGL: ztracený kontext'));
+    })();
+  </script>
   <!-- Audio autoplay-policy unlock: the browser creates the OpenAL AudioContext SUSPENDED until a
        user gesture, so the game runs but is silent. Track every AudioContext (wrap the constructor
        BEFORE blackops.js creates one — incl. the proxied DOM-thread one) and resume them on the
@@ -168,10 +196,10 @@
       canvas: (function () { return document.getElementById('canvas'); })(),
       arguments: ['+set','fs_b','/','+set','fs_h','/','+set','bo1_zombies','1','+set','zombiemode','1','+set','r_fullscreen','0','+set','r_clear','0','+set','com_maxfps','30','+devmap','zombie_theater'],   // ?map=<name> overrides; edit or add +set dvar value
       noInitialRun: true,            // we call run() ourselves after data is ready
-      print:    (t) => console.log(t),
-      printErr: (t) => { console.warn(t); try { if (/error|abort|exception|fail|fatal|GL_INVALID|context/i.test(t)) window.__kbShowErr && window.__kbShowErr(t); } catch(e){} },
+      print:    (t) => { console.log(t); KBZBootLog(t); },
+      printErr: (t) => { console.warn(t); KBZBootLog(t); try { if (/error|abort|exception|fail|fatal|GL_INVALID|context/i.test(t)) window.__kbShowErr && window.__kbShowErr(t); } catch(e){} },
       onAbort:  (w) => { try { window.__kbShowErr && window.__kbShowErr('[abort] ' + w); } catch(e){} },
-      setStatus: (t) => { if (t) document.getElementById('status').textContent = t; },
+      setStatus: (t) => { if (t) { document.getElementById('status').textContent = t; KBZBootLog(t); } },
       // NOTE: Emscripten's default $HOME is already '/home/web_user' (see getEnvStrings),
       // so getenv("HOME") is non-empty and SHGetFolderPathA() resolves the engine's
       // "user documents" base to /home/web_user/Activision/CoD — never /tmp.
@@ -389,14 +417,14 @@
   <script src="web_fs.js"></script>
   <script src="sha256-stream.js"></script>
   <script src="kino-pack.js"></script>
-  <script src="engine-loader.js?v=dxt-fallback-1"></script>
+  <script src="engine-loader.js?v=boot-diagnostics-1"></script>
 
   <script>
     const statusEl = document.getElementById('status');
     function setStatus(t) { statusEl.textContent = t; }
 
     let kbEngineStarted = false;
-    function startEngine() {
+    async function startEngine() {
       // Re-entry guard: a second callMain mid-run re-executes the boot path on top of the
       // live game (duplicated argv, trashed fastfile state -> "Couldn't find the bsp").
       // Seen when a stray Enter re-activates the still-focused #pick button.
@@ -406,8 +434,12 @@
       // Module.run() is provided by blackops.js once the runtime is initialized.
       const launch = () => {
         if (document.documentElement.classList.contains("mobile")) Module._KBMobile_Enable?.(1);
-        Module.callMain(Module.arguments);
+        KBZBootLog('Vstup do main / Com_Init');
+          Module.callMain(Module.arguments);
+          KBZBootLog('main předalo řízení prohlížeči');
       };
+      KBZBootLog('Runtime připraven; předání řízení enginu');
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
       if (Module.calledRun) launch();
       else { Module.onRuntimeInitialized = launch; }
     }
@@ -427,7 +459,7 @@
         await window.KBZLoadEngine();
         setStatus(`Ověřeno ${n} souborů. Spouštění…`);
         btn.disabled = true; btn.blur();   // Enter must never re-trigger the pick/boot
-        startEngine();
+        await startEngine();
       } catch (e) { btn.disabled = false; console.error(e); setStatus("Spuštění selhalo: " + e.message); }
     });
 
