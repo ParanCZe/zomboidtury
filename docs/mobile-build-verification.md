@@ -21,3 +21,7 @@ The deployed `zone/Common/code_post_gfx.ff` was downloaded (2,248,000 bytes, `IW
 ## Remaining runtime verification
 
 The available cloud browser rejected the WebGL2 context before engine startup. No rendered Kino map, audio playback or first Zombies round has been verified. Real Safari testing is still required. In particular, fastfile pointer/layout compatibility, sound decoding and peak memory at map load remain unverified; successful C++ compilation does not establish them.
+
+## Optional S3TC fallback
+
+The original 2D and cube upload code selected compressed DXT uploads by texture format even when the GL extension list reported no S3TC support. The revised source decodes DXT1/3/5 into temporary RGBA8 buffers when S3TC is unavailable, covering 2D textures, cube faces and material texture arrays. Supported contexts retain compressed uploads. Input-length and allocation-overflow checks prevent reading truncated blocks. Tests cover solid colors, DXT1 transparency, DXT3/5 alpha, both DXT5 alpha palette modes, non-multiple-of-four dimensions and truncated inputs. These tests passed under AddressSanitizer/UndefinedBehaviorSanitizer with leak detection disabled because the execution environment cannot inspect process tasks. This verifies CPU conversion; it is not evidence of a rendered scene on Safari.
