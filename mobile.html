@@ -5,8 +5,9 @@
 <button id="mini">☰ BO1Z</button>
 <div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.5</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
-<label>Originální KisakBlack-web.mjs <input id="mjs" type="file" accept=".mjs,.js,text/javascript"></label>
-<label>Originální KisakBlack-web.wasm <input id="wasm" type="file" accept=".wasm,application/wasm"></label>
+<label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
+<label>Originální KisakBlack-web.wasm <input id="wasm" type="file"></label>
+<small>iPhone / iPad: Výběr souborů neomezuji podle přípony, aby šly vybrat i soubory .wasm a .mjs v aplikaci Soubory.</small>
 <label>Mapa <select id="map"><option value="zombie_theater">Kino der Toten</option><option value="zombie_pentagon">Five</option><option value="zombie_cod5_prototype">Nacht der Untoten</option></select></label>
 <div class="toolbar"><button id="boot" class="primary">SPUSTIT ORIGINÁLNÍ ENGINE</button><button id="show" class="secondary" type="button">Skrýt panel</button><button id="copy" class="secondary" type="button">Kopírovat protokol</button></div>
 <div id="status">Připraveno.</div><pre id="log">Připraveno. Nejprve vyber oba originální soubory.</pre>
