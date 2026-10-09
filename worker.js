@@ -1,6 +1,47 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/bo1z-icon.png" || url.pathname === "/apple-touch-icon.png") {
+      // Native 180x180 PNG icon for iOS Home Screen (no external raster service).
+      const W=180,H=180,raw=new Uint8Array(H*(1+W*4));
+      const letters={
+        B:["11110","10001","10001","11110","10001","10001","11110"],
+        O:["01110","10001","10001","10001","10001","10001","01110"],
+        1:["00100","01100","00100","00100","00100","00100","01110"],
+        Z:["11111","00001","00010","00100","01000","10000","11111"]
+      };
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+        const p=y*(W*4+1)+1+x*4,dx=x-90,dy=y-90,r=Math.sqrt(dx*dx+dy*dy);
+        let rgb=r>69&&r<74?[215,173,102]:[12,20,33];
+        if(x<5||y<5||x>=W-5||y>=H-5)rgb=[11,19,31];
+        const text="BO1Z",step=7,scale=5,left=21,top=72;
+        const n=Math.floor((x-left)/(6*scale));
+        if(n>=0&&n<text.length){
+          const lx=Math.floor((x-left-n*6*scale)/scale),ly=Math.floor((y-top)/scale);
+          if(lx>=0&&lx<5&&ly>=0&&ly<7&&letters[text[n]][ly][lx]==="1")rgb=[246,221,173];
+        }
+        raw[p]=rgb[0];raw[p+1]=rgb[1];raw[p+2]=rgb[2];raw[p+3]=255;
+      }
+      const adler=(bytes)=>{let a=1,b=0;for(const v of bytes){a=(a+v)%65521;b=(b+a)%65521}return ((b<<16)|a)>>>0};
+      const zparts=[Uint8Array.of(0x78,0x01)];
+      for(let p=0;p<raw.length;p+=65535){
+        const n=Math.min(65535,raw.length-p),l=(~n)&65535,final=p+n===raw.length?1:0;
+        zparts.push(Uint8Array.of(final,n&255,n>>>8,l&255,l>>>8),raw.subarray(p,p+n));
+      }
+      const v=adler(raw);
+      zparts.push(Uint8Array.of(v>>>24,(v>>>16)&255,(v>>>8)&255,v&255));
+      const pack=(arr)=>{const len=arr.reduce((n,x)=>n+x.length,0),out=new Uint8Array(len);let p=0;for(const x of arr){out.set(x,p);p+=x.length}return out};
+      const z=pack(zparts),ihdr=new Uint8Array(13);
+      const view=new DataView(ihdr.buffer);view.setUint32(0,W);view.setUint32(4,H);ihdr[8]=8;ihdr[9]=6;
+      const crc=bytes=>{let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^(c&1?0xedb88320:0)}return(c^0xffffffff)>>>0};
+      const chunk=(name,data)=>{
+        const body=new Uint8Array(4+data.length),out=new Uint8Array(12+data.length);
+        for(let i=0;i<4;i++)body[i]=name.charCodeAt(i);
+        body.set(data,4);const v=new DataView(out.buffer);v.setUint32(0,data.length);out.set(body,4);v.setUint32(out.length-4,crc(body));return out;
+      };
+      const png=pack([Uint8Array.of(137,80,78,71,13,10,26,10),chunk("IHDR",ihdr),chunk("IDAT",z),chunk("IEND",new Uint8Array())]);
+      return new Response(png,{headers:{"Content-Type":"image/png","Cache-Control":"public, max-age=86400","Cross-Origin-Resource-Policy":"same-origin"}});
+    }
     if (url.pathname === "/api/kino/manifest") {
       try {
         const upstream = await fetch("https://vel.gg/bo1z/kino/manifest.json", {
