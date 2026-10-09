@@ -166,7 +166,7 @@
   <script>
     window.Module = {
       canvas: (function () { return document.getElementById('canvas'); })(),
-      arguments: ['+devmap', (new URLSearchParams(location.search).get('map') || 'mp_nuked')],   // ?map=<name> overrides; edit or add +set dvar value
+      arguments: ['+set','fs_b','/','+set','fs_h','/','+set','bo1_zombies','1','+set','zombiemode','1','+set','r_fullscreen','0','+set','r_clear','0','+set','com_maxfps','30','+devmap','zombie_theater'],   // ?map=<name> overrides; edit or add +set dvar value
       noInitialRun: true,            // we call run() ourselves after data is ready
       print:    (t) => console.log(t),
       printErr: (t) => { console.warn(t); try { if (/error|abort|exception|fail|fatal|GL_INVALID|context/i.test(t)) window.__kbShowErr && window.__kbShowErr(t); } catch(e){} },
@@ -387,6 +387,8 @@
   </script>
 
   <script src="web_fs.js"></script>
+  <script src="sha256-stream.js"></script>
+  <script src="kino-pack.js"></script>
   <script src="engine-loader.js"></script>
 
   <script>
@@ -417,11 +419,16 @@
         setStatus("select your Steam \"Call of Duty Black Ops\" folder…");
         // pickFolder() uses showDirectoryPicker() on a secure context (https/
         // localhost) and falls back to <input webkitdirectory> over plain HTTP/LAN.
-        const n = await Module.KBFS.pickFolder();
+        const probe = document.createElement('canvas').getContext('webgl2');
+        if (!probe) throw new Error('WebGL2 není v tomto prohlížeči dostupné.');
+        probe.getExtension('WEBGL_lose_context')?.loseContext();
+        btn.disabled = true;
+        const n = await window.KBZPack.open(Module.KBFS, setStatus);
+        await window.KBZLoadEngine();
         setStatus(`granted: ${n} files indexed. booting…`);
         btn.disabled = true; btn.blur();   // Enter must never re-trigger the pick/boot
         startEngine();
-      } catch (e) { console.error(e); setStatus("folder pick cancelled/failed: " + e.message); }
+      } catch (e) { btn.disabled = false; console.error(e); setStatus("Spuštění selhalo: " + e.message); }
     });
 
     // Fake-file smoke FS: replaces KBFS with a tiny in-memory provider so the

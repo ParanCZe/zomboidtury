@@ -4,7 +4,7 @@
   const style=document.createElement('link');style.rel='stylesheet';style.href='mobile.css';document.head.append(style);
   const viewport=document.createElement('meta');viewport.name='viewport';viewport.content='width=device-width, initial-scale=1, viewport-fit=cover';document.head.append(viewport);
   const canvas=document.getElementById('canvas');
-  const pick=document.getElementById('pick');pick.textContent='Načíst herní soubory';
+  const pick=document.getElementById('pick');pick.textContent='Stáhnout Kino a spustit';
   const panel=document.createElement('div');panel.id='mobile-controls';
   panel.innerHTML='<div id="move-pad"><span></span></div><div id="look-pad"></div><div id="mobile-actions">'+
     '<button data-key="-1">STŘELBA</button><button data-key="-2">MÍŘENÍ</button>'+
@@ -15,7 +15,7 @@
     '</div><div id="mobile-rotate">Otoč telefon na šířku</div>';
   document.body.append(panel);
   const info=document.createElement('p');info.id='mobile-info';
-  info.textContent='Testovací mobilní build. Načti vlastní originální herní soubory. Kino ani běh na iPhonu zatím nejsou ověřené.';
+  info.textContent='První stažení: přibližně 888 MiB. Data zůstanou uložená v telefonu. Experimentální Zombies port; hratelnost na iPhonu zatím není ověřená.';
   pick.parentElement.append(info);
   const keys=new KBMobileKeys.KeyOwners((key,down)=> {if(Module._KBMobile_Key) Module._KBMobile_Key(key,Number(down));});
   let motionPointer=null, movePointer=null, previous=null, lookStart=null;
