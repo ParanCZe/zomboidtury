@@ -313,7 +313,7 @@ for(const name of gfxNames){
  js=js.replace(pattern,match=>{count++;return match+'try{err("BO1Z GFX WORKER "+'+JSON.stringify(name)+'+" called pthread="+(typeof ENVIRONMENT_IS_PTHREAD!=="undefined"?ENVIRONMENT_IS_PTHREAD:"?"))}catch(e){};'});
  log("GFX WORKER HOOK",name,count);
 }
-const watchContextFix="try{const c=GL.contexts[handle],old=GL.currentContext,wasCurrent=!!old;if(c&&!old)GL.makeContextCurrent(handle);err(\"BO1Z CTX BRIDGE handle=\"+handle+\" old=\"+wasCurrent+\" active=\"+!!GL.currentContext+\" same=\"+(GL.currentContext===c)+\" lost=\"+(c?.GLctx?.isContextLost?.()??\"?\")+\" thread=\"+ENVIRONMENT_IS_PTHREAD)}catch(e){err(\"BO1Z CTX BRIDGE ERROR \"+e.message)};";
+const watchContextFix="try{const c=GL.contexts[handle],old=GL.currentContext,wasCurrent=!!old;if(c&&old!==c)GL.makeContextCurrent(handle);err(\"BO1Z CTX BRIDGE handle=\"+handle+\" old=\"+wasCurrent+\" active=\"+!!GL.currentContext+\" same=\"+(GL.currentContext===c)+\" lost=\"+(c?.GLctx?.isContextLost?.()??\"?\")+\" thread=\"+ENVIRONMENT_IS_PTHREAD)}catch(e){err(\"BO1Z CTX BRIDGE ERROR \"+e.message)};";
 const watchName="function WatchD3DContext(handle,user,callback){";
 if(js.includes(watchName)){
  js=js.replace(watchName,watchName+watchContextFix+'try{var _c=GL.contexts[handle];err("BO1Z GL REAL CONTEXT handle="+handle+" exists="+!!_c+" version="+(_c?.version??"?")+" canvas="+(_c?.GLctx?.canvas?.constructor?.name??"?")+" lost="+(_c?.GLctx?.isContextLost?.()??"?")+" pthread="+ENVIRONMENT_IS_PTHREAD)}catch(e){err("BO1Z GL REAL CONTEXT ERROR "+e.message)};');
