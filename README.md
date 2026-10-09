@@ -4,7 +4,7 @@ Open https://parancze.github.io/zomboidtury/?mobile=1 in Safari and press **Stá
 
 ## Deployment
 
-In repository **Settings → Pages → Build and deployment → Source**, select **GitHub Actions**. The `Build Kino data and deploy mobile Pages` workflow downloads the publicly accessible upstream pack, checks every SHA-256 against `kino-manifest.json`, and publishes it together with the player from the same origin. Game data are not committed to Git. The page cannot download its pack until this workflow has deployed successfully.
+GitHub Actions deploys automatically after pushes to main. If legacy branch Pages is enabled, the workflow waits for its deployment before publishing the complete pack. Selecting **GitHub Actions** under repository **Settings → Pages → Build and deployment → Source** is optional and avoids the redundant branch deployment. The `Build Kino data and deploy mobile Pages` workflow downloads the publicly accessible upstream pack, checks every SHA-256 against `kino-manifest.json`, and publishes it together with the player from the same origin. Game data are not committed to Git. The page cannot download its pack until this workflow has deployed successfully.
 
 ## Engine and verification limits
 
