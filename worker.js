@@ -226,11 +226,14 @@ export default {
     }
     // Serve the AutoTest as an actual HTML document on iOS, even when the asset
     // layer assigns a generic downloadable MIME type to .html files.
-    const isAutoTest = ["/autotest","/autotest.html","/playtest","/playtest.html"].includes(url.pathname);
+    const isAutoTest = ["/autotest","/autotest.html","/playtest","/playtest.html","/launcher","/launcher.html"].includes(url.pathname);
     // Cloudflare assets normalize /autotest.html -> /autotest. Do not rewrite
     // /autotest back to .html, or Safari enters a redirect loop.
     const response = await env.ASSETS.fetch(request);
     const headers = new Headers(response.headers);
+    if(url.pathname==="/bo1z.webmanifest")headers.set("Content-Type","application/manifest+json; charset=utf-8");
+    if(url.pathname==="/bo1z-sw.js")headers.set("Content-Type","application/javascript; charset=utf-8");
+    if(url.pathname==="/bo1z-icon.svg")headers.set("Content-Type","image/svg+xml");
     if (isAutoTest && response.ok) {
       headers.set("Content-Type", "text/html; charset=utf-8");
       headers.delete("Content-Disposition");
