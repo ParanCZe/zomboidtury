@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
@@ -40,6 +41,23 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # A repository with legacy Pages enabled also starts a branch deployment.
+      # Wait for that run so it cannot overwrite the complete data artifact.
+      - name: Wait for legacy branch Pages deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            for (let attempt = 0; attempt < 60; attempt++) {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner, repo: context.repo.repo,
+                head_sha: context.sha, per_page: 100
+              });
+              const legacy = data.workflow_runs.filter(run => run.path === 'dynamic/pages/pages-build-deployment');
+              if (legacy.every(run => run.status === 'completed')) return;
+              core.info('Waiting for branch Pages deployment before publishing the complete Kino pack.');
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+            throw new Error('Legacy Pages deployment did not finish within ten minutes.');
       - name: Publish Pages
         id: deployment
         uses: actions/deploy-pages@v4
