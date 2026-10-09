@@ -55,7 +55,7 @@ export default {
         const r = await fetch(u, { redirect: "manual" });
         if (!r.ok) return new Response("CDN HTTP " + r.status,{status:502});
         const body = await r.arrayBuffer();
-        if (body.byteLength > 1000000) return new Response("Chunk too large",{status:502});
+        if (body.byteLength > 9437184) return new Response("Chunk too large",{status:502});
         return new Response(body,{headers:{"Content-Type":"application/octet-stream","Cache-Control":"public, max-age=300","Cross-Origin-Resource-Policy":"same-origin","Cross-Origin-Opener-Policy":"same-origin","Cross-Origin-Embedder-Policy":"require-corp","X-Content-Type-Options":"nosniff"}});
       } catch(e) {return new Response("Chunk proxy failed: "+(e?.message||"unknown"),{status:502});}
     }
