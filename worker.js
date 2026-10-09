@@ -103,6 +103,39 @@ export default {
         }});
       }catch(e){return new Response("Chunk proxy error: "+(e?.message||"unknown"),{status:502});}
     }
+    // Stream raw manifest-listed assets directly to OPFS without buffering the
+    // whole file in Worker memory, including large files lacking chunk metadata.
+    if (url.pathname === "/api/kino/raw-stream") {
+      try {
+        const path = url.searchParams.get("path") || "";
+        if (!/^[a-zA-Z0-9_./-]{1,160}$/.test(path) || path.includes(".."))
+          return new Response("Invalid path", {status:400});
+        const mr=await fetch("https://vel.gg/bo1z/kino/manifest.json",{
+          redirect:"manual",cf:{cacheTtl:120,cacheEverything:true}});
+        if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
+        const mf=await mr.json();
+        if(mf.map!=="zombie_theater" || !Array.isArray(mf.files))
+          throw Error("Unexpected manifest");
+        const entry=mf.files.find(x=>x.path===path);
+        if(!entry || (Array.isArray(entry.br)&&entry.br.length) ||
+           !Number.isSafeInteger(entry.size) || entry.size<=0)
+          return new Response("Raw path not permitted", {status:404});
+        const upstream=await fetch("https://cdn.vel.gg/packs/kino/"+path,{
+          redirect:"manual",headers:{"Accept-Encoding":"identity"}});
+        if(upstream.status!==200 || !upstream.body)
+          return new Response("Raw CDN HTTP "+upstream.status,{status:502});
+        const len=Number(upstream.headers.get("content-length")||0);
+        if(len && len!==entry.size)return new Response("Raw content-length mismatch",{status:502});
+        return new Response(upstream.body,{headers:{
+          "Content-Type":"application/octet-stream",
+          "Cache-Control":"no-store",
+          "Cross-Origin-Resource-Policy":"same-origin",
+          "Cross-Origin-Opener-Policy":"same-origin",
+          "Cross-Origin-Embedder-Policy":"require-corp",
+          "X-Content-Type-Options":"nosniff"
+        }});
+      }catch(e){return new Response("Raw stream proxy error: "+(e?.message||"unknown"),{status:502});}
+    }
     if (url.pathname === "/api/kino/raw-test") {
       const path = "zone/english/en_code_pre_gfx_mp.ff";
       const expectedSize = 2016;
