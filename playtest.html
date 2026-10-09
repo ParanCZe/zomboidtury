@@ -1,0 +1,469 @@
+<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><meta name="theme-color" content="#060b12"><title>BO1Z – Original engine mobile boot</title>
+<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;touch-action:none;background:#030509;color:#f3f6ff;font:14px/1.45 -apple-system,system-ui,sans-serif}button,select,input{font:inherit}#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#000}#shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(#0007,transparent 24%,transparent 70%,#0006)}#dock{position:fixed;inset:0;pointer-events:none;display:none}#dock.show{display:block}#joystick{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:max(23px,env(safe-area-inset-left));width:clamp(103px,19vmin,160px);aspect-ratio:1;border:2px solid #f9ffff54;background:#ffffff19;border-radius:50%;pointer-events:auto;touch-action:none}#nub{position:absolute;width:42%;aspect-ratio:1;background:#ffffff9b;border-radius:50%;top:29%;left:29%;pointer-events:none}#actions{position:absolute;bottom:max(20px,env(safe-area-inset-bottom));right:max(18px,env(safe-area-inset-right));display:flex;align-items:flex-end;gap:10px;pointer-events:auto}.stack{display:flex;flex-direction:column;gap:10px}.touchbtn{border:2px solid #e5f3ff66;background:#52617e5a;color:#fff;font-size:11px;font-weight:900;width:60px;aspect-ratio:1;border-radius:50%;touch-action:none}#shoot{width:clamp(88px,17vmin,135px);background:#ae553b66;border-color:#eac39a;font-size:15px}#look{position:fixed;inset:0 0 0 42%;z-index:1;touch-action:none;pointer-events:none}#dock.show #look{pointer-events:auto}#dock.show #actions,#dock.show #joystick{z-index:3}#mini{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(15px,env(safe-area-inset-right));z-index:5;background:#0c152ad9;border:1px solid #ffffff44;border-radius:9px;padding:8px 11px;color:#cbd6e8;font-size:11px}#ui{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:#070d17ef;overflow:auto;padding:20px}#panel{width:min(100%,610px);max-height:94vh;overflow:auto;background:#101b2eea;border:1px solid #47607a;padding:20px;border-radius:18px;box-shadow:0 12px 60px #000c}h1{font-size:clamp(27px,5vw,40px);line-height:1.15;margin:6px 0 8px}p{color:#becada}small{color:#a4b6d0}label{display:block;margin:10px 0;color:#d6e2f8}input[type=file],select{display:block;width:100%;padding:9px;background:#081325;border:1px solid #3d5170;border-radius:9px;color:#eef3ff;margin-top:5px}button.primary{background:#e4bf82;color:#081323;font-size:16px;font-weight:900;border:0;border-radius:12px;padding:13px 20px}button.primary:disabled{opacity:.5}button.secondary{background:#263b54;color:white;border:1px solid #60728b;border-radius:10px;padding:9px 13px}pre{background:#030914;color:#c6d5ef;padding:12px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-radius:9px;max-height:180px;overflow:auto}.warning{border-left:3px solid #e0b276;padding:9px 12px;background:#34281785;color:#e9d6b9}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}#status{font-size:13px;color:#bce2e5;font-weight:700}@media(orientation:portrait){#joystick{width:98px}#shoot{width:82px}.touchbtn{width:49px;font-size:10px}#panel{padding:14px}} </style><script src="/webgl-compat.js?v=1"></script></head>
+<body><canvas id="game" width="960" height="720"></canvas><div id="shade"></div>
+<div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
+<button id="mini">☰ BO1Z</button>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · WEBGL COMPAT PLAYTEST v1</small><h1>Spustit BO1 Zombies – WebGL oprava</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div class="warning">PRVNÍ HERNÍ BUILD: WASM je skutečně upravený pro webový renderer. Hratelnost zatím není ověřená na iPhonu. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
+<label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
+<label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
+<small>iPhone / iPad: Výběr souborů neomezuji podle přípony, aby šly vybrat i soubory .wasm a .mjs v aplikaci Soubory.</small>
+<label>Mapa <select id="map"><option value="zombie_theater">Kino der Toten</option><option value="zombie_pentagon">Five</option><option value="zombie_cod5_prototype">Nacht der Untoten</option></select></label>
+<div class="toolbar"><button id="rawtest" class="secondary" type="button">TEST ZBÝVAJÍCÍCH .FF</button></div>
+<div class="toolbar"><button id="downloadBoot" class="primary" type="button">STÁHNOUT BOOT DATA KINO</button><button id="stopDownload" class="secondary" type="button">POZASTAVIT</button><button id="scanDownload" class="secondary" type="button">STAV STAŽENÍ</button></div>
+<p><small>Stahování probíhá postupně po jednotlivých souborech do OPFS /pack-kino. Po přerušení znovu ověří již hotové soubory. Soubory bez dostupných Brotli bloků se zatím přeskočí. Větší soubory nad 128 MB jsou v této verzi také pozastavené kvůli paměti iPhonu.</small></p>
+<div class="toolbar"><button id="chunkcheck" class="secondary" type="button">STÁHNOUT A OVĚŘIT IW_00</button></div>
+<div class="toolbar"><button id="assetcheck" class="secondary" type="button">OVĚŘIT HERNÍ DATA / OPFS</button></div><p><small>Test stáhne jen malý vzorek dat, nikoli celou mapu. Před plným stažením (~931 MB) ověříme oprávnění a kapacitu zařízení.</small></p>
+<div class="toolbar"><button id="boot" class="primary">SPUSTIT OPRAVENÝ ENGINE</button><button id="show" class="secondary" type="button">Skrýt panel</button><button id="copyGfx" class="secondary" type="button">Kopírovat GFX diagnostiku</button><button id="copy" class="secondary" type="button">Kopírovat protokol</button><button id="saveLog" class="secondary" type="button">Uložit log .txt</button><button id="restoreLog" class="secondary" type="button">Obnovit log po zamrznutí</button></div>
+<div id="status">Připraveno.</div><pre id="log">Připraveno. Nejprve vyber oba originální soubory.</pre>
+<small>Souborové binárky se pouze čtou lokálně; neposílají se na GitHub ani Cloudflare. Nahrání originálních mapových dat řešíme odděleně. Dotyková tlačítka fungují pouze ve chvíli, kdy přijímá originální runtime vstupy.</small>
+</div></div>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id), canvas=$("game"),logs=[];let module=null,modURL=null,lastError="",held=new Set(),touchX=null,stickId=null,moveTimer=0;let booting=false;
+const savedKey="bo1z-last-engine-log-v269";
+let cachedEngine={mjs:null,wasm:null};
+async function engineCacheRoot(){const root=await navigator.storage.getDirectory();return root.getDirectoryHandle("bo1z-local-engine",{create:true})}
+async function loadEngineCache(){
+ try{const root=await engineCacheRoot();
+  for(const [key,name] of [["mjs","engine.mjs"],["wasm","engine.wasm"]]){
+   try{const f=await (await root.getFileHandle(name)).getFile();if(f.size>0)cachedEngine[key]=f}catch(e){if(e?.name!=="NotFoundError")throw e}
+  }
+  if(cachedEngine.mjs&&cachedEngine.wasm)stat("Originální engine uložen v iPhonu. Příště stačí pouze spustit test.");
+ }catch(e){log("ENGINE LOCAL CACHE READ ERROR",e.message)}
+}
+async function saveEngineCache(){
+ try{const root=await engineCacheRoot();
+  for(const [key,name] of [["mjs","engine.mjs"],["wasm","engine.wasm"]]){
+   const file=$(key).files[0];if(!file)continue;
+   const handle=await root.getFileHandle(name,{create:true});
+   const writer=await handle.createWritable();await writer.write(file);await writer.close();
+   cachedEngine[key]=await handle.getFile();
+   log("ENGINE CACHED LOCAL",name,cachedEngine[key].size);
+  }
+ }catch(e){log("ENGINE LOCAL CACHE WRITE ERROR",e.message)}
+}
+for(const key of ["mjs","wasm"])$(key).addEventListener("change",()=>{void saveEngineCache()});
+void loadEngineCache();
+
+let sinceSave=0;
+const persistLog=()=>{try{localStorage.setItem(savedKey,logs.join("\n").slice(-150000))}catch{}};
+const log=(...msg)=>{let s=msg.map(x=>typeof x==="string"?x:String(x)).join(" ");logs.push(s);if(/BO1Z D3D NATIVE STATE|BO1Z CTX BRIDGE|BO1Z GL REAL CONTEXT|BO1Z GL CREATE|GRAPHICS GLUE SOURCE|GFX WORKER HOOK|BO1Z GFX WORKER|GFX BRIDGE|WEBGL2 PREFLIGHT|WORKER WEBGL2|CANVAS TRANSFER|CANVAS OWNERSHIP|CreateDevice|Direct3D unavailable|Couldn\x27t initialize renderer|WebGL renderer initialization failed/i.test(s)){graphicsLines.push(s);if(graphicsLines.length>160)graphicsLines.shift()}if(logs.length>400)logs.shift();$("log").textContent=logs.slice(-90).join("\n");$("log").scrollTop=$("log").scrollHeight;console.log("[BO1Z]",s);if(++sinceSave>=5||/ERROR|ERR |EXIT|ABORT|BOOT OPFS/.test(s)){sinceSave=0;persistLog()}};
+const graphicsLines=[];
+const gfxPattern=/BO1Z D3D NATIVE STATE|BO1Z CTX BRIDGE|BO1Z GL REAL CONTEXT|BO1Z GL CREATE|GRAPHICS GLUE SOURCE|GFX WORKER HOOK|BO1Z GFX WORKER|GFX BRIDGE|WEBGL2 PREFLIGHT|WORKER WEBGL2|CANVAS TRANSFER|CANVAS OWNERSHIP|CreateDevice|Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed/i;
+const originalLog=log;
+$("copyGfx").onclick=async()=>{
+ const full=(graphicsLines.length?graphicsLines:logs.filter(x=>gfxPattern.test(x))).join("\n");
+ if(!full){stat("Zatím nejsou k dispozici grafické události.");return}
+ try{await navigator.clipboard.writeText(full);stat("Grafická diagnostika zkopírována: "+full.split("\n").length+" řádků.");}
+ catch(e){const ta=document.createElement("textarea");ta.value=full;ta.style.cssText="position:fixed;inset:7%;width:86%;height:70%;z-index:9999";document.body.appendChild(ta);ta.focus();ta.select();stat("Výpis označen – zkopíruj ho ručně.");}
+};
+const stat=s=>$("status").textContent=s;
+const onerr=e=>log("GLOBAL ERROR",e?.message||e);window.addEventListener("error",onerr);window.addEventListener("unhandledrejection",e=>log("REJECTION",e.reason?.message||e.reason));
+function key(code,pressed){if(!module?._KB_Input)return;const id="k"+code;if(pressed===held.has(id))return;held[pressed?"add":"delete"](id);try{module._KB_Input(0,code,pressed?1:0)}catch(e){log("KEY ERROR",e.message)}}
+function mouse(code,pressed){key(code,pressed)}
+function aim(dx,dy){if(!module?._KB_Input)return;try{module._KB_Input(2,Math.round(dx),Math.round(dy))}catch{}}
+function releaseKeys(){for(const k of [...held]){const code=+k.slice(1);try{module?._KB_Input?.(0,code,0)}catch{}}held.clear()}
+function touchButton(id,code){const node=$(id);node.addEventListener("pointerdown",e=>{e.preventDefault();node.setPointerCapture(e.pointerId);mouse(code,true)});for(const ev of ["pointerup","pointercancel","lostpointercapture"])node.addEventListener(ev,e=>{e.preventDefault();mouse(code,false)})}
+touchButton("shoot",200);touchButton("reload",114);touchButton("sprint",160);
+const stick=$("joystick"),nub=$("nub");let lastKeys=[];
+function syncMove(dx,dy){const state=[dy<-.26?119:0,dy>.26?115:0,dx<-.26?97:0,dx>.26?100:0].filter(Boolean);for(let k of lastKeys)if(!state.includes(k))key(k,false);for(let k of state)if(!lastKeys.includes(k))key(k,true);lastKeys=state}
+function moveStick(e){const r=stick.getBoundingClientRect();let dx=(e.clientX-(r.left+r.width/2))/(r.width*.32),dy=(e.clientY-(r.top+r.height/2))/(r.height*.32);const l=Math.hypot(dx,dy);if(l>1){dx/=l;dy/=l}dx=Math.max(-1,Math.min(1,dx));dy=Math.max(-1,Math.min(1,dy));nub.style.transform="translate("+(dx*r.width*.32)+"px,"+(dy*r.height*.32)+"px)";syncMove(dx,dy)}
+stick.addEventListener("pointerdown",e=>{stickId=e.pointerId;stick.setPointerCapture(stickId);moveStick(e)});stick.addEventListener("pointermove",e=>{if(e.pointerId===stickId)moveStick(e)});
+function endStick(e){if(e.pointerId!==stickId)return;stickId=null;nub.style.transform="";syncMove(0,0)}stick.addEventListener("pointerup",endStick);stick.addEventListener("pointercancel",endStick);
+const look=$("look");look.addEventListener("pointerdown",e=>{touchX={id:e.pointerId,x:e.clientX,y:e.clientY};look.setPointerCapture(e.pointerId)});
+look.addEventListener("pointermove",e=>{if(touchX?.id!==e.pointerId)return;aim((e.clientX-touchX.x)*1.35,(e.clientY-touchX.y)*1.35);touchX.x=e.clientX;touchX.y=e.clientY});
+look.addEventListener("pointerup",e=>{if(touchX?.id===e.pointerId)touchX=null});look.addEventListener("pointercancel",()=>touchX=null);
+const keyCodes={KeyW:119,KeyA:97,KeyS:115,KeyD:100,KeyR:114,Space:32,ShiftLeft:160,Escape:27};
+window.addEventListener("keydown",e=>{if(document.activeElement?.tagName==="INPUT"||document.activeElement?.tagName==="SELECT")return;const k=keyCodes[e.code];if(k){key(k,true);e.preventDefault()}});window.addEventListener("keyup",e=>{const k=keyCodes[e.code];if(k)key(k,false)});window.addEventListener("blur",releaseKeys);
+function showUI(show){$("ui").style.display=show?"flex":"none";$("dock").classList.toggle("show",!show);if(show)releaseKeys()}
+$("mini").onclick=()=>showUI(true);$("show").onclick=()=>showUI(false);$("copy").onclick=async()=>{
+ const full=logs.join("\n");
+ try{
+  if(!navigator.clipboard?.writeText)throw Error("Clipboard API unavailable");
+  await navigator.clipboard.writeText(full);
+  stat("Protokol zkopírován ("+logs.length+" řádků).");
+ }catch(err){
+  log("CLIPBOARD FALLBACK",err.name||"",err.message||"");
+  const ta=document.createElement("textarea");
+  ta.value=full;ta.readOnly=true;ta.style.cssText="position:fixed;z-index:99999;inset:8%;width:84%;height:70%;font-size:13px;background:#101b2e;color:white;";
+  document.body.appendChild(ta);ta.focus();ta.select();ta.setSelectionRange(0,ta.value.length);
+  let ok=false;try{ok=document.execCommand("copy")}catch{}
+  ta.remove();
+  stat(ok?"Protokol zkopírován záložní metodou.":"Schránka odmítla kopírování. Použij Uložit log .txt.");
+ }
+};
+$("restoreLog").onclick=()=>{
+ try{
+  const previous=localStorage.getItem(savedKey);
+  if(!previous){stat("Zatím není uložený protokol.");return}
+  logs.length=0;logs.push(...previous.split("\n"));
+  $("log").textContent=logs.slice(-90).join("\n");
+  stat("Obnoven log z předchozího spuštění. Klikni Uložit log .txt.");
+ }catch(e){stat("Nelze obnovit log: "+e.message)}
+};
+$("saveLog").onclick=()=>{
+ try{
+  const content=logs.join("\n")||"BO1Z log is empty";
+  const blob=new Blob([content],{type:"text/plain;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download="BO1Z-mobile-log-"+new Date().toISOString().replace(/[:.]/g,"-")+".txt";
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  stat("Log připraven ke stažení jako .txt.");
+ }catch(e){stat("Nelze uložit log: "+e.message)}
+};
+$("assetcheck").onclick=async()=>{
+const btn=$("assetcheck");btn.disabled=true;stat("Test herních dat spuštěn – kontroluji OPFS a manifest…");log("ASSET BUTTON CLICKED");
+try{
+log("ASSET PREFLIGHT PLAYTEST v1.0","origin",location.origin);
+if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
+const estimate=await navigator.storage.estimate();
+log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
+const root=await navigator.storage.getDirectory();
+const handle=await root.getFileHandle("bo1z-opfs-test.txt",{create:true});
+const stream=await handle.createWritable();await stream.write("BO1Z mobile preflight");await stream.close();
+log("OPFS WRITE", (await (await handle.getFile()).text())==="BO1Z mobile preflight"?"OK":"READ MISMATCH");
+await root.removeEntry("bo1z-opfs-test.txt");
+let manifest;
+const manifestURL="/api/kino/manifest";
+try{
+ const res=await fetch(manifestURL,{cache:"no-store"});
+ if(!res.ok)throw Error("HTTP "+res.status+": "+(await res.text()).slice(0,180));
+ manifest=await res.json();
+ log("MANIFEST VIA WORKER OK",manifest.map,"files",manifest.files?.length,"bytes",manifest.total_bytes);
+}catch(e){log("MANIFEST WORKER ERROR",e.message);return}
+const entry=manifest.files.find(f=>f.path==="localization.txt");
+if(!entry)throw Error("V manifestu chybí localization.txt");
+const sampleURL="/api/kino/sample";
+log("CDN SAMPLE VIA WORKER",sampleURL);
+try{
+ const r=await fetch(sampleURL,{cache:"no-store"});
+ if(!r.ok)throw Error("HTTP "+r.status+": "+(await r.text()).slice(0,200));
+ const buf=await r.arrayBuffer();
+ const head=[...new Uint8Array(buf.slice(0,16))].map(x=>x.toString(16).padStart(2,"0")).join(" ");
+ log("CDN SAMPLE VIA WORKER OK",buf.byteLength,"bytes","expected compressed bytes",entry.br?.[0],"head",head);
+ const hash=[...new Uint8Array(await crypto.subtle.digest("SHA-256",buf))].map(x=>x.toString(16).padStart(2,"0")).join("");
+ log("SAMPLE SHA256",hash,"expected unpacked",entry.sha256);
+ if(buf.byteLength===entry.size&&hash===entry.sha256){
+   log("SAMPLE VERIFIED SHA256 – unpacked original data");
+   const opfs=await navigator.storage.getDirectory();
+   const testDir=await opfs.getDirectoryHandle("bo1z-verified-samples",{create:true});
+   const h=await testDir.getFileHandle("localization.txt",{create:true});
+   const w=await h.createWritable();await w.write(buf);await w.close();
+   const check=await (await h.getFile()).arrayBuffer();
+   const checkHash=[...new Uint8Array(await crypto.subtle.digest("SHA-256",check))].map(x=>x.toString(16).padStart(2,"0")).join("");
+   log(checkHash===entry.sha256?"SAMPLE OPFS VERIFIED – localization.txt uložen":"SAMPLE OPFS HASH MISMATCH");
+ } else if(buf.byteLength===entry.br?.[0]){
+   log("SAMPLE IS COMPRESSED – chunk matches declared length, Brotli decode required before installing");
+ } else {
+   log("SAMPLE NOT VERIFIED – wrong length or SHA256; do not install");
+ }
+}catch(e){log("CDN SAMPLE VIA WORKER ERROR",e.message)}
+} catch(e){log("PREFLIGHT ERROR",e.name,e.message)}
+finally{btn.disabled=false}
+};
+$("chunkcheck").onclick=async()=>{
+ const btn=$("chunkcheck");btn.disabled=true;stat("Stahuji a ověřuji celý iw_00.iwd (cca 11 MB)…");
+ try{
+  log("IW00 FULL VERIFY PLAYTEST v1.0");
+  const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
+  if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
+  const mf=await mr.json(),entry=mf.files.find(f=>f.path==="main/iw_00.iwd");
+  if(!entry||entry.br?.length!==2)throw Error("Neočekávaný manifest iw_00");
+  const parts=[];
+  for(let i=0;i<2;i++){
+   const r=await fetch("/api/kino/iw00/chunk"+i,{cache:"no-store"});
+   if(!r.ok)throw Error("Chunk "+i+" HTTP "+r.status+": "+(await r.text()).slice(0,100));
+   const part=new Uint8Array(await r.arrayBuffer());
+   const expected=i===0?8388608:entry.size-8388608;
+   log("IW00 PART",i,part.byteLength,"bytes expected",expected);
+   if(part.byteLength!==expected)throw Error("Wrong chunk "+i+" size");
+   parts.push(part);
+  }
+  const full=new Uint8Array(entry.size);full.set(parts[0],0);full.set(parts[1],parts[0].length);
+  const hash=[...new Uint8Array(await crypto.subtle.digest("SHA-256",full))].map(x=>x.toString(16).padStart(2,"0")).join("");
+  log("IW00 SHA256",hash);
+  log("IW00 EXPECTED",entry.sha256);
+  if(hash!==entry.sha256)throw Error("SHA256 mismatch; archive NOT installed");
+  log("IW00 VERIFIED SHA256 – original full archive");
+  const root=await navigator.storage.getDirectory();
+  const dir=await root.getDirectoryHandle("bo1z-verified-samples",{create:true});
+  const file=await dir.getFileHandle("iw_00.iwd",{create:true});
+  const out=await file.createWritable();await out.write(full);await out.close();
+  const reread=await (await file.getFile()).arrayBuffer();
+  const hash2=[...new Uint8Array(await crypto.subtle.digest("SHA-256",reread))].map(x=>x.toString(16).padStart(2,"0")).join("");
+  if(hash2!==entry.sha256)throw Error("OPFS file verification failed");
+  log("IW00 OPFS VERIFIED – testovací kopie uložena");
+  stat("iw_00.iwd ověřen a uložen do testovací složky.");
+ }catch(e){log("IW00 VERIFY ERROR",e.name,e.message);stat("Ověření iw_00 selhalo: "+e.message)}
+ finally{btn.disabled=false}
+};
+$("rawtest").onclick=async()=>{
+ const btn=$("rawtest");btn.disabled=true;stat("Ověřuji dostupnost malého nekomprimovaného FF souboru…");
+ try {
+  log("RAW FF PREFLIGHT PLAYTEST v1.0");
+  const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
+  if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
+  const manifest=await mr.json();
+  const file=manifest.files.find(f=>f.path==="zone/english/en_code_pre_gfx_mp.ff");
+  if(!file)throw Error("File absent in manifest");
+  const response=await fetch("/api/kino/raw-test",{cache:"no-store"});
+  if(!response.ok)throw Error("RAW PROXY HTTP "+response.status+" "+(await response.text()).slice(0,200));
+  const bytes=await response.arrayBuffer();
+  const hash=[...new Uint8Array(await crypto.subtle.digest("SHA-256",bytes))].map(n=>n.toString(16).padStart(2,"0")).join("");
+  log("RAW FF SIZE",bytes.byteLength,"expected",file.size);
+  log("RAW FF SHA256",hash,"expected",file.sha256);
+  if(bytes.byteLength===file.size&&hash===file.sha256)log("RAW FF VERIFIED – direct CDN path confirmed");
+  else log("RAW FF MISMATCH – do not save, investigate CDN delivery");
+ }catch(e){log("RAW FF ERROR",e.name,e.message);stat("Test FF: "+e.message)}
+ finally{btn.disabled=false}
+};
+let downloadStopped=false,downloadActive=false;
+const toHex=buf=>[...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,"0")).join("");
+async function kinoRoot(){const r=await navigator.storage.getDirectory();return await r.getDirectoryHandle("pack-kino",{create:true})}
+async function kinoHandle(root,path,create){const pieces=path.split("/");let dir=root;for(const p of pieces.slice(0,-1))dir=await dir.getDirectoryHandle(p,{create});return dir.getFileHandle(pieces.at(-1),{create})}
+async function verifyFile(handle,entry){const file=await handle.getFile();if(file.size!==entry.size)return false;const digest=toHex(await crypto.subtle.digest("SHA-256",await file.arrayBuffer()));return digest===entry.sha256}
+async function manifestFiles(){
+ const resp=await fetch("/api/kino/manifest",{cache:"no-store"});
+ if(!resp.ok)throw Error("Manifest HTTP "+resp.status);
+ const mf=await resp.json();if(mf.map!=="zombie_theater")throw Error("Wrong manifest map");
+ return mf.files.filter(x=>x.class==="boot");
+}
+$("stopDownload").onclick=()=>{downloadStopped=true;stat("Pozastavuji po dokončení právě stahované části…");log("DOWNLOAD PAUSE REQUESTED")};
+$("scanDownload").onclick=async()=>{try{
+ const files=await manifestFiles(),root=await kinoRoot();let complete=0,bytes=0,unsupported=0;
+ for(const entry of files){if((!entry.br?.length && !(entry.path.endsWith(".ff") && entry.size<=64*1048576))||entry.size>128*1048576){unsupported++;continue}
+ try{const h=await kinoHandle(root,entry.path,false);if(await verifyFile(h,entry)){complete++;bytes+=entry.size}}catch(e){if(e.name!=="NotFoundError")throw e}
+ }
+ log("KINO BOOT STATUS",complete,"files verified",bytes,"bytes;",unsupported,"files unsupported/too large; total",files.length);
+ stat("Ověřeno "+complete+" / "+files.length+" boot souborů.");
+ }catch(e){log("SCAN ERROR",e.name,e.message)}};
+$("downloadBoot").onclick=async()=>{
+ if(downloadActive)return;downloadActive=true;downloadStopped=false;
+ const btn=$("downloadBoot");btn.disabled=true;
+ try{
+  const files=await manifestFiles(),root=await kinoRoot();let completed=0,skipped=0,bytesDone=0;
+  log("KINO DOWNLOADER PLAYTEST v1.0",files.length,"boot files; resume per verified file");
+  for(const entry of files){
+   if(downloadStopped)break;
+   if(!entry.br?.length && !(entry.path.endsWith(".ff") && entry.size<=64*1048576)){log("UNSUPPORTED NO BR",entry.path);skipped++;continue}
+   if(entry.size>128*1048576){log("DEFERRED MEMORY LIMIT",entry.path,entry.size);skipped++;continue}
+   const h=await kinoHandle(root,entry.path,true);
+   if(await verifyFile(h,entry)){completed++;bytesDone+=entry.size;log("RESUME VERIFIED",entry.path);continue}
+   const isRaw=!entry.br?.length;
+   log("DOWNLOADING",entry.path,"size",entry.size,"chunks",isRaw?1:entry.br.length,"mode",isRaw?"RAW":"BROTLI");
+   const partial=await h.createWritable();let offset=0,failed=false;
+   try{
+    for(let i=0;i<(isRaw?1:entry.br.length);i++){
+     if(downloadStopped){failed=true;break}
+     const u=isRaw?"/api/kino/raw?path="+encodeURIComponent(entry.path):"/api/kino/chunk?path="+encodeURIComponent(entry.path)+"&part="+i;
+     const response=await fetch(u);
+     if(!response.ok)throw Error("HTTP "+response.status+" "+(await response.text()).slice(0,120));
+     const bytes=await response.arrayBuffer();
+     const expected=isRaw?entry.size:Math.min(8388608,entry.size-offset);
+     if(bytes.byteLength!==expected)throw Error("Chunk size mismatch "+bytes.byteLength+" expected "+expected+" at "+i);
+     await partial.write({type:"write",position:offset,data:bytes});
+     offset+=bytes.byteLength;
+     stat(entry.path+" – "+Math.round(offset/entry.size*100)+"% ("+completed+"/"+files.length+")");
+    }
+    await partial.close();
+   }catch(e){failed=true;try{await partial.abort()}catch{}throw e}
+   if(failed){try{await partial.abort()}catch{}break}
+   if(offset!==entry.size||!(await verifyFile(h,entry)))throw Error("SHA-256 FAILED "+entry.path);
+   completed++;bytesDone+=entry.size;
+   log("KINO FILE VERIFIED",entry.path,entry.size);
+  }
+  log("KINO DOWNLOAD STOP", "verified this pass",completed,"deferred",skipped,"bytes",bytesDone,"paused",downloadStopped);
+  stat(downloadStopped?"Pozastaveno; spusť znovu pro pokračování.":"Dostupná startovní data dokončena (zvuky přeskočeny); zkontroluj stav souborů.");
+ }catch(e){log("KINO DOWNLOAD ERROR",e.name,e.message);stat("Stahování přerušeno: "+e.message)}
+ finally{downloadActive=false;btn.disabled=false}
+};
+log("UI READY PLAYTEST v1.0 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
+function patch(js){
+const substitutions=[
+["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
+['new Worker(new URL("KisakBlack-web.mjs",import.meta.url),{type:"module",name:"em-pthread"})','new Worker(Module["pthreadWorkerURL"],{type:"module",name:"em-pthread"})',"worker URL = local patched module"],
+["imports[x]=original=new WebAssembly.Suspending(original)","imports[x]=original","JSPI import wrappers disabled"],
+["WebAssembly.promising(original)","original","JSPI main export wrapper disabled"],
+["WebAssembly.promising(getWasmTableEntry(ptr))(arg)","getWasmTableEntry(ptr)(arg)","JSPI thread callback disabled"]
+];
+for(const [a,b,name] of substitutions){if(!js.includes(a))throw Error("Předloha nepodporuje patch: "+name);js=js.replaceAll(a,b);log("PATCH",name)}
+const memoryCtor='wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:INITIAL_MEMORY/65536,shared:true})';
+if(!js.includes(memoryCtor))throw Error("Nenalezen původní konstruktor WASM paměti");
+js=js.replace(memoryCtor,'wasmMemory=Module["wasmMemory"]||new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:INITIAL_MEMORY/65536,shared:true})');
+log("PATCH initMemory používá předanou wasmMemory; žádná druhá alokace");
+const alreadyTransferred='if(canvas.controlTransferredOffscreen){err(`pthread_create: cannot transfer canvas with ID "${name}" to thread, since the current thread does not have control over it!`);error=63;break}';
+if(!js.includes(alreadyTransferred))throw Error("Nenalezena Emscripten canvas-transfer větev");
+js=js.replace(alreadyTransferred,'if(canvas.controlTransferredOffscreen){console.warn("BO1Z: canvas already owned by another worker; spawn this worker without canvas transfer");continue}');
+log("PATCH duplicitní předání canvasu -> další pthread bez canvasu");
+const transferMarker='canvas.controlTransferredOffscreen=true';
+const transferOccurrences=js.split(transferMarker).length-1;
+log("CANVAS TRANSFER MARKER",transferOccurrences);
+if(transferOccurrences>=1){
+ js=js.replaceAll(transferMarker,'console.warn("BO1Z CANVAS TRANSFER MARK",typeof name!=="undefined"?name:"unknown");'+transferMarker);
+ log("PATCH CANVAS OWNERSHIP TRACE enabled");
+}else log("CANVAS OWNERSHIP TRACE SKIPPED – unexpected generated glue code");
+
+const gfxNames=["emscripten_webgl_create_context","emscripten_webgl_make_context_current","emscripten_webgl_get_current_context","WatchD3DContext","UnwatchD3DContext","RegisterWebGPUContext"];
+for(const name of gfxNames){
+ const pattern=new RegExp("function\\s+"+name+"\\s*\\([^)]*\\)\\s*\\{","g");
+ let count=0;
+ js=js.replace(pattern,match=>{count++;return match+'try{err("BO1Z GFX WORKER "+'+JSON.stringify(name)+'+" called pthread="+(typeof ENVIRONMENT_IS_PTHREAD!=="undefined"?ENVIRONMENT_IS_PTHREAD:"?"))}catch(e){};'});
+ log("GFX WORKER HOOK",name,count);
+}
+const watchContextFix="try{let nativePtr=HEAPU32[176078180>>>2]>>>0;err(\"BO1Z D3D NATIVE STATE ptr=\"+nativePtr+\" present=\"+!!nativePtr+\" ogl=\"+!!GL.currentContext+\" webglHandle=\"+handle+\" pthread=\"+ENVIRONMENT_IS_PTHREAD)}catch(err){try{console.error(\"BO1Z D3D NATIVE STATE ERROR \"+err.message)}catch(_){}};try{const c=GL.contexts[handle],old=GL.currentContext,wasCurrent=!!old;if(c&&old!==c)GL.makeContextCurrent(handle);err(\"BO1Z CTX BRIDGE handle=\"+handle+\" old=\"+wasCurrent+\" active=\"+!!GL.currentContext+\" same=\"+(GL.currentContext===c)+\" lost=\"+(c?.GLctx?.isContextLost?.()??\"?\")+\" thread=\"+ENVIRONMENT_IS_PTHREAD)}catch(e){err(\"BO1Z CTX BRIDGE ERROR \"+e.message)};";
+const watchName="function WatchD3DContext(handle,user,callback){";
+if(js.includes(watchName)){
+ js=js.replace(watchName,watchName+watchContextFix+'try{var _c=GL.contexts[handle];err("BO1Z GL REAL CONTEXT handle="+handle+" exists="+!!_c+" version="+(_c?.version??"?")+" canvas="+(_c?.GLctx?.canvas?.constructor?.name??"?")+" lost="+(_c?.GLctx?.isContextLost?.()??"?")+" pthread="+ENVIRONMENT_IS_PTHREAD)}catch(e){err("BO1Z GL REAL CONTEXT ERROR "+e.message)};');
+ log("PATCH real WebGL context tracking enabled");
+}else log("PATCH real WebGL context tracking NOT FOUND");
+const createContextName="var _emscripten_webgl_create_context=_emscripten_webgl_do_create_context;";
+if(js.includes(createContextName)){
+ js=js.replace(createContextName,'var _emscripten_webgl_create_context=function(...a){var h=_emscripten_webgl_do_create_context(...a);err("BO1Z GL CREATE handle="+h+" pthread="+ENVIRONMENT_IS_PTHREAD+" exists="+!!GL.contexts[h]);return h};');
+ log("PATCH WebGL context creation tracking enabled");
+}else log("PATCH WebGL context creation tracking NOT FOUND");
+const start="function __asyncjs__InitializeWebGPU(pipeline){",end='__asyncjs__InitializeWebGPU.sig="ii"';const a=js.indexOf(start),b=js.indexOf(end,a);
+if(a<0||b<0)throw Error("WebGPU init nenalezen");
+js=js.slice(0,a)+'function __asyncjs__InitializeWebGPU(pipeline){console.warn("BO1Z mobile forced WebGL2 fallback");return 0}'+js.slice(b);
+log("PATCH WebGPU init -> synchronní návrat 0 (WebGL fallback)");
+return js;
+}
+$("boot").onclick=async()=>{
+if(booting)return;
+const wasmFile=$("wasm").files[0]||cachedEngine.wasm,mjsFile=$("mjs").files[0]||cachedEngine.mjs;
+if(!wasmFile||!mjsFile){stat("Vyber oba soubory jednou, potom se budou načítat automaticky.");return}
+if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
+booting=true;$("boot").disabled=true;logs.length=0;graphicsLines.length=0;
+log("BOOT ORIGINAL KISAKBLACK – MOBILE PLAYTEST v1.0",new Date().toISOString());
+log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
+let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
+try{
+const originalSource=await mjsFile.text();
+for(const term of ["function WatchD3DContext(","function UnwatchD3DContext(","function RegisterWebGPUContext(","emscripten_webgl_create_context:","emscripten_webgl_create_context=","function _emscripten_webgl_create_context(","function __emscripten_webgl_create_context(","function BrowserCreateContext("]){
+ const p=originalSource.indexOf(term);log("GRAPHICS GLUE SOURCE",term,p<0?"NOT FOUND":originalSource.slice(Math.max(0,p-90),Math.min(originalSource.length,p+620)).replace(/\\s+/g," "));
+}
+const envTokens=["ENVIRONMENT_IS_WEB","ENVIRONMENT_IS_WORKER","ENVIRONMENT_IS_NODE","ENVIRONMENT_IS_PTHREAD","ENVIRONMENT_IS_SHELL","isNode","isWorker","createContext","OffscreenCanvas","getContext"];
+for(const token of envTokens){const hits=originalSource.split(token).length-1;log("ORIGINAL GLUE TOKEN",token,hits)}
+log("BROWSER ENVIRONMENT","window",typeof window,"document",typeof document,"process",typeof process,"OffscreenCanvas",typeof OffscreenCanvas,"navigator",typeof navigator);
+let source=patch(originalSource);const bytes=await wasmFile.arrayBuffer();
+log("Original files",bytes.byteLength,"WASM bytes,",source.length,"patched JS chars");
+if(typeof window.bo1zWebGLCompat!=="function")throw Error("Chybí oprava webgl-compat.js");
+log("WEBGL COMPAT PATCH","normalizing D3D presentation settings for browser");
+const compatibleBytes=window.bo1zWebGLCompat(bytes);
+log("WEBGL COMPAT WASM READY","original",bytes.byteLength,"patched",compatibleBytes.byteLength,"delta",compatibleBytes.byteLength-bytes.byteLength);
+const compiled=await WebAssembly.compile(compatibleBytes);log("WEBGL COMPAT WASM COMPILED");
+const wasmMemoryImport=WebAssembly.Module.imports(compiled).find(x=>x.kind==="memory");
+if(!wasmMemoryImport?.type?.minimum)throw Error("WASM nemá očekávaný memory import");
+const wasmMemorySize=wasmMemoryImport.type.minimum*65536;
+const initialMemoryLiteral="var INITIAL_MEMORY=2147418112";
+if(!source.includes(initialMemoryLiteral))throw Error("Není nalezen původní INITIAL_MEMORY");
+source=source.replace(initialMemoryLiteral,"var INITIAL_MEMORY="+wasmMemorySize);
+log("EARLY MEMORY PATCH",Math.round(wasmMemorySize/1048576)+" MiB (před importem MJS)");
+if(modURL)URL.revokeObjectURL(modURL);
+modURL=URL.createObjectURL(new Blob([source],{type:"text/javascript"}));
+const factory=(await import(modURL)).default;
+if(typeof factory!=="function")throw Error("Originální MJS neexportuje Emscripten factory");
+log("ORIGINAL MJS IMPORTED");
+const memoryImport=WebAssembly.Module.imports(compiled).find(x=>x.kind==="memory");
+log("WASM MEMORY IMPORT",JSON.stringify(memoryImport));
+let memory;
+try{
+const min=memoryImport?.type?.minimum??32767,max=memoryImport?.type?.maximum??32767;
+const shared=memoryImport?.type?.shared??true;
+const declared=min*65536;
+if(declared!==wasmMemorySize)throw Error("Neshoda WASM paměti");
+log("LOW MEMORY PATCH",Math.round(declared/1048576)+" MiB; matching WASM import and MJS");
+log("MEMORY REQUEST","pages="+min,"max="+max,"shared="+shared,"estimated MiB="+Math.round(min*65536/1048576));
+memory=new WebAssembly.Memory({initial:min,maximum:max,shared});
+log("MEMORY ALLOCATED",memory.buffer.byteLength,"bytes");
+}catch(e){log("MEMORY ALLOCATION FAILED",e.name,e.message||"(no browser message)");throw e}
+const config={
+canvas,noInitialRun:true,pthreadWorkerURL:modURL,wasmMemory:memory,
+print:t=>log("ENGINE",t),printErr:t=>log("ENGINE ERR",t),
+onAbort:t=>{log("ENGINE ABORT",t);showUI(true)},onExit:code=>{log("ENGINE EXIT",code);showUI(true)},
+onRuntimeInitialized:()=>log("RUNTIME INITIALIZED","canvasTransferred",!!canvas.controlTransferredOffscreen),
+instantiateWasm(imports,done){try{
+const names=["emscripten_webgl_create_context","emscripten_webgl_make_context_current","emscripten_webgl_get_current_context","emscripten_webgl_get_context_attributes","emscripten_webgl_get_drawing_buffer_size","emscripten_is_webgl_context_lost","WatchD3DContext","UnwatchD3DContext","RegisterWebGPUContext","__asyncjs__InitializeWebGPU"];
+for(const n of names){const fn=imports.env?.[n];if(typeof fn!=="function"){log("GFX BRIDGE IMPORT ABSENT",n);continue}
+let calls=0;imports.env[n]=function(...args){const count=++calls;if(count<=12)log("GFX BRIDGE CALL",n,"#",count,"args",JSON.stringify(args));try{const result=fn.apply(this,args);if(count<=12)log("GFX BRIDGE RESULT",n,"#",count,"value",String(result));return result}catch(e){log("GFX BRIDGE THROW",n,e.stack||e.message);throw e}}}
+const instance=new WebAssembly.Instance(compiled,imports);done(instance,compiled);log("WASM INSTANCE + REAL IMPORTS OK")}catch(err){log("WASM INIT ERROR",err.stack||err.message);throw err}}
+};
+stat("Inicializuju původní engine a pthread workery…");
+module=await factory(config);
+log("PTHREAD BOOTSTRAP / ORIGINAL FACTORY FINISHED");
+let opfsBootRoot;
+try{
+ opfsBootRoot=await navigator.storage.getDirectory();
+ const packDir=await opfsBootRoot.getDirectoryHandle("pack-kino",{create:false});
+ const mainDir=await packDir.getDirectoryHandle("main",{create:false});
+ const mapDir=await (await packDir.getDirectoryHandle("zone",{create:false})).getDirectoryHandle("Common",{create:false});
+ const englishDir=await (await packDir.getDirectoryHandle("zone",{create:false})).getDirectoryHandle("english",{create:false});
+ const critical=await englishDir.getFileHandle("en_code_pre_gfx_mp.ff",{create:false});
+ const criticalFile=await critical.getFile();
+ log("CRITICAL OPFS FILE PRESENT","zone/english/en_code_pre_gfx_mp.ff",criticalFile.size,"bytes");
+ // Diagnostic compatibility alias: engine requests english/code_pre_gfx_mp.ff
+ // while the verified Kino manifest stores code_pre_gfx_mp.ff under Common.
+ try{
+  const aliasName="code_pre_gfx_mp.ff";
+  let exists=false;
+  try{await englishDir.getFileHandle(aliasName,{create:false});exists=true}catch(err){if(err.name!=="NotFoundError")throw err}
+  if(exists){log("ZONE PATH ALIAS EXISTS","zone/english/"+aliasName)}
+  else{
+   const original=await mapDir.getFileHandle(aliasName,{create:false});
+   const data=await (await original.getFile()).arrayBuffer();
+   const alias=await englishDir.getFileHandle(aliasName,{create:true});
+   const writer=await alias.createWritable();await writer.write(data);await writer.close();
+   log("ZONE PATH ALIAS CREATED","zone/Common/"+aliasName,"->","zone/english/"+aliasName,"bytes",data.byteLength);
+  }
+ }catch(err){log("ZONE PATH ALIAS ERROR",err.name,err.message)}
+ const archive=await mainDir.getFileHandle("iw_00.iwd",{create:false});
+ const mapAsset=await mapDir.getFileHandle("zombie_theater.ff",{create:false});
+ log("BOOT OPFS CHECK","main/iw_00.iwd",(await archive.getFile()).size,"zone/Common/zombie_theater.ff",(await mapAsset.getFile()).size);
+ log("ENGINE FILESYSTEM API","FS",typeof module?.FS,"mount",typeof module?.FS?.mount,"OPFS",typeof module?.FS?.filesystems?.OPFS);
+ log("NOTE: Browser OPFS existence does not prove Emscripten filesystem mount; engine must mount /opfs itself");
+}catch(e){log("BOOT OPFS CHECK FAILED",e.name,e.message)}
+const args=['+set','fs_b','/opfs/pack-kino','+set','fs_h','/opfs/user','+set','kisak_zombies','1','+set','zombiemode','1','+set','r_webgpu','0','+set','r_fullscreen','0','+set','r_smp_backend','0','+set','r_aaSamples','1','+set','r_clear','0','+set','r_customMode',canvas.width+'x'+canvas.height,'+devmap',$("map").value];
+persistLog();
+log("RENDER RESOLUTION",canvas.width+"x"+canvas.height,"minimum target 800x600");
+// Independent WebGL2 probe; do not claim the game canvas before Emscripten transfers it.
+try{
+ const probeCanvas=document.createElement("canvas");
+ probeCanvas.width=32;probeCanvas.height=32;
+ const probeGL=probeCanvas.getContext("webgl2",{failIfMajorPerformanceCaveat:false});
+ log("WEBGL2 PREFLIGHT",probeGL?"OK":"FAILED",probeGL?"renderer="+probeGL.getParameter(probeGL.RENDERER):"","webgl2="+!!probeGL);
+ probeGL?.getExtension("WEBGL_lose_context")?.loseContext();
+}catch(e){log("WEBGL2 PREFLIGHT ERROR",e.name,e.message)}
+try{
+ const workerScript='self.onmessage=()=>{try{const c=new OffscreenCanvas(32,32);const gl=c.getContext("webgl2");self.postMessage({ok:!!gl,renderer:gl?gl.getParameter(gl.RENDERER):null,offscreen:typeof OffscreenCanvas})}catch(e){self.postMessage({ok:false,error:e.name+": "+e.message})}}';
+ const diagnosticUrl=URL.createObjectURL(new Blob([workerScript],{type:"text/javascript"}));
+ const diagnosticWorker=new Worker(diagnosticUrl);
+ const result=await Promise.race([
+  new Promise(resolve=>{diagnosticWorker.onmessage=e=>resolve(e.data);diagnosticWorker.onerror=e=>resolve({ok:false,error:e.message||"Worker script failed"});diagnosticWorker.postMessage({})}),
+  new Promise(resolve=>setTimeout(()=>resolve({ok:false,error:"timeout 1500ms"}),1500))
+ ]);
+ log("WORKER WEBGL2 PREFLIGHT",JSON.stringify(result));
+ diagnosticWorker.terminate();URL.revokeObjectURL(diagnosticUrl);
+}catch(e){log("WORKER WEBGL2 PREFLIGHT ERROR",e.name,e.message)}
+log("CANVAS OWNERSHIP BEFORE BOOT","canvas.transferControlToOffscreen",typeof canvas.transferControlToOffscreen);
+log("CANVAS BEFORE MAIN","transferControlToOffscreen",typeof canvas.transferControlToOffscreen,"controlTransferredOffscreen",!!canvas.controlTransferredOffscreen,"webgl2ContextProbe","skipped to avoid stealing GPU context");
+let heartbeat=0,previousTick=performance.now();
+const ticker=setInterval(()=>{
+ const now=performance.now(),lag=Math.round(now-previousTick-1000);previousTick=now;
+ if(lag>200)log("MAIN EVENT LOOP LAG",lag,"ms");
+ if(++heartbeat%5===0)log("MAIN EVENT LOOP ALIVE",heartbeat,"s","canvasTransferred",!!canvas.controlTransferredOffscreen);
+},1000);
+window.addEventListener("pagehide",()=>clearInterval(ticker),{once:true});
+log("RUN ORIGINAL MAIN",args.join(" "));
+stat("Spouštím originální main; panel nechávám otevřený kvůli dostupnosti logu.");
+log("BOOT UI SAFE MODE – panel remains visible throughout engine test");
+showUI(true);
+await new Promise(resolve=>setTimeout(resolve,80));
+try{const code=await module.callMain(args);log("ORIGINAL MAIN RETURN",String(code));stat("Main skončil: "+String(code)+" – log zůstává dostupný");showUI(true)}
+catch(err){log("MAIN ERROR",err.stack||err.message);stat("Herní main skončil chybou – viz protokol.");showUI(true)}
+}catch(err){log("BOOT ERROR",err.name||"",err.message||"(no browser message)",err.stack||"");stat("Start selhal – pošli protokol.");showUI(true)}
+finally{clearTimeout(timeout);booting=false;$("boot").disabled=false}
+};
+})();
+</script></body></html>
