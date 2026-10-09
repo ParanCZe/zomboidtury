@@ -91,10 +91,72 @@ try{
 }
 throw last;
 }
+
+async function repairFullArchive(root,h,e,ctx){
+ // The CDN may return a same-sized but wrong assembly of incomplete or
+ // mismatched fragments. Download the direct original IWD to a separate
+ // temporary file; only replace the target after full hash verification.
+ const parts=e.path.split("/");const leaf=parts.pop();
+ const tempPath=[...parts,leaf+".raw-repair.part"].join("/");
+ const tmp=await target(root,tempPath);
+ try{
+  ctx.status("SHA-256 nesouhlasí: "+e.path+". Ověřuji přímý originální archiv…");
+  await rawFile(tmp,e,ctx);
+  const candidate=await tmp.getFile();
+  if(candidate.size!==e.size)throw Error("Náhradní archiv má "+candidate.size+" místo "+e.size+" bajtů");
+  const digest=await shaFile(candidate);
+  if(digest.toLowerCase()!==e.sha256.toLowerCase()){
+   throw Error("Přímý archiv rovněž neodpovídá SHA-256 manifestu ("+digest.slice(0,16)+")");
+  }
+  // This file is verified; copy it in bounded chunks to the canonical path.
+  const dest=await h.createWritable();
+  const reader=candidate.stream().getReader();
+  let n=0;
+  try{
+   await dest.truncate(0);
+   for(;;){
+    if(ctx.cancelled?.())throw Error("Stahování pozastaveno");
+    const r=await reader.read();if(r.done)break;
+    n+=r.value.byteLength;
+    if(n>e.size)throw Error("Přepsání přesáhlo velikost manifestu");
+    await dest.write(r.value);
+    ctx.progress(e,n);
+   }
+   if(n!==e.size)throw Error("Nedokončené kopírování ověřeného archivu");
+   await dest.close();
+  }catch(error){try{await dest.abort()}catch{}throw error}
+  finally{reader.releaseLock()}
+  const placed=await h.getFile();
+  if(placed.size!==e.size || (await shaFile(placed)).toLowerCase()!==e.sha256.toLowerCase())
+   throw Error("Kopie náhradního archivu neprošla závěrečnou kontrolou");
+  clearPart(e);record(e,placed);
+  return placed;
+ }finally{
+  // Never leave a second, potentially giant, archive stored on the iPhone.
+  try{const dirParts=tempPath.split("/");const name=dirParts.pop();
+   let directory=root;for(const p of dirParts)directory=await directory.getDirectoryHandle(p);
+   await directory.removeEntry(name);
+  }catch{}
+ }
+}
+
 async function eachFile(root,e,ctx){
  const h=await target(root,e.path),before=await h.getFile();
  if(await existsVerified(h,e)){clearPart(e);ctx.completed(e,true);return}
  resetRecord(e);
+ if(before.size===e.size && e.br?.length){
+  // This complete local file has a known mismatching SHA. Do not redownload
+  // identical CDN parts: first try a genuine origin archive.
+  try{
+   await repairFullArchive(root,h,e,ctx);
+   ctx.completed(e,false);return;
+  }catch(error){
+   if(ctx.cancelled?.())throw error;
+   throw Error("Data archivu "+e.path+" mají správnou velikost, ale neplatný SHA-256. "+
+    "Ani přímý originál nelze ověřit: "+error.message+
+    ". Již stažené ověřené soubory zůstaly uložené.");
+  }
+ }
  if(!e.br?.length){
   clearPart(e);
   await rawFile(h,e,ctx);
@@ -149,7 +211,17 @@ async function eachFile(root,e,ctx){
  const digest=await shaFile(finished);
  if(digest.toLowerCase()!==e.sha256.toLowerCase()){
   resetRecord(e);clearPart(e);
-  throw Error("SHA-256 nesouhlasí u "+e.path+"; archiv musí být stažen znovu");
+  if(e.br?.length){
+   try{
+    await repairFullArchive(root,h,e,ctx);
+    ctx.completed(e,false);return;
+   }catch(error){
+    throw Error("Zdroj pro "+e.path+" vrátil soubor "+e.size+
+     " bajtů, ale SHA-256 neodpovídá manifestu. Náhradní originál selhal: "+
+     error.message+". Je potřeba opravit zdroj herního archivu; jiné soubory zůstaly zachované.");
+   }
+  }
+  throw Error("SHA-256 nesouhlasí u "+e.path+"; ani originální data nejsou ověřena");
  }
  clearPart(e);record(e,finished);ctx.completed(e,false);
 }
