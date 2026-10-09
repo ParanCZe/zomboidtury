@@ -21,13 +21,59 @@ try{if(position===0)await out.truncate(0);await out.write({type:"write",position
 catch(e){try{await out.abort()}catch{}throw e}
 }
 async function shrink(h,length){const out=await h.createWritable({keepExistingData:true});try{await out.truncate(length);await out.close()}catch(e){try{await out.abort()}catch{}throw e}}
-async function block(url,size,label){
-let last;for(let tryNumber=1;tryNumber<=4;tryNumber++)try{
- const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw Error(label+" HTTP "+r.status);
- const bytes=new Uint8Array(await r.arrayBuffer());if(bytes.length!==size)throw Error(label+" délka "+bytes.length+" místo "+size);
- return bytes;
-}catch(e){last=e;if(tryNumber<4)await new Promise(done=>setTimeout(done,800*tryNumber))}
-throw last;
+
+function partKey(e){return "bo1z-part-resume-v3:"+e.path}
+function clearPart(e){try{localStorage.removeItem(partKey(e))}catch{}}
+function resumePart(e,file){
+ try{
+  const s=JSON.parse(localStorage.getItem(partKey(e))||"null");
+  if(s && s.sha===e.sha256 && s.count===e.br.length && s.size===file.size &&
+    s.lastModified===file.lastModified && Number.isInteger(s.next) &&
+    s.next>=0 && s.next<=e.br.length)return s;
+ }catch{}
+ return null;
+}
+function markPart(e,next,file){
+ try{localStorage.setItem(partKey(e),JSON.stringify({
+  sha:e.sha256,count:e.br.length,next,size:file.size,lastModified:file.lastModified
+ }))}catch{}
+}
+async function streamPart(h,e,i,offset,ctx){
+ let last;
+ for(let attempt=1;attempt<=4;attempt++){
+  if(ctx.cancelled?.())throw Error("Stahování pozastaveno");
+  try{
+   const url="/api/kino/chunk-stream?path="+encodeURIComponent(e.path)+"&part="+i;
+   const r=await fetch(url,{cache:"no-store"});
+   if(!r.ok)throw Error(e.path+" blok "+(i+1)+": HTTP "+r.status+" "+(await r.text()).slice(0,150));
+   if(!r.body)throw Error("Odpověď bloku nepodporuje stream");
+   const writer=await h.createWritable({keepExistingData:offset!==0});
+   const reader=r.body.getReader();let bytes=0;
+   try{
+    if(offset===0)await writer.truncate(0);
+    for(;;){
+     if(ctx.cancelled?.())throw Error("Stahování pozastaveno");
+     const {done,value}=await reader.read();if(done)break;
+     bytes+=value.length;
+     if(offset+bytes>e.size)throw Error("Blok překračuje velikost souboru v manifestu: "+e.path);
+     await writer.write({type:"write",position:offset+bytes-value.length,data:value});
+     ctx.progress(e,offset+bytes);
+    }
+    if(bytes===0)throw Error("Prázdný blok archivu");
+    await writer.close();
+   }catch(err){
+    try{await reader.cancel()}catch{}
+    try{await writer.abort()}catch{}
+    throw err;
+   }finally{reader.releaseLock()}
+   return offset+bytes;
+  }catch(e2){
+   last=e2;
+   if(ctx.cancelled?.())throw e2;
+   if(attempt<4)await new Promise(done=>setTimeout(done,1000*attempt));
+  }
+ }
+ throw last;
 }
 async function rawFile(h,e,ctx){
 let last;for(let tries=1;tries<=3;tries++){
@@ -46,32 +92,42 @@ try{
 throw last;
 }
 async function eachFile(root,e,ctx){
-const h=await target(root,e.path),before=await h.getFile();
-if(await existsVerified(h,e)){ctx.completed(e,true);return}
-resetRecord(e);
-if(!e.br?.length)await rawFile(h,e,ctx);
-else{
- const parts=Math.ceil(e.size/CHUNK);
- if(e.br.length!==parts)throw Error("Manifest pro "+e.path+" má "+e.br.length+" bloků, ale očekáváno "+parts);
- let offset=before.size;
- // A complete file with a failed checksum must be downloaded again, not silently accepted.
- if(offset>=e.size)offset=0;
- else offset=Math.floor(offset/CHUNK)*CHUNK;
- if(before.size!==offset)await shrink(h,offset);
- ctx.progress(e,offset);
- for(let i=offset/CHUNK;i<parts;i++){
-  if(ctx.cancelled?.())throw Error("Stahování pozastaveno");
-  const pos=i*CHUNK,expected=Math.min(CHUNK,e.size-pos);
-  const data=await block("/api/kino/chunk?path="+encodeURIComponent(e.path)+"&part="+i,expected,e.path+" blok "+(i+1));
-  await append(h,data,pos);ctx.progress(e,pos+data.length);
+ const h=await target(root,e.path),before=await h.getFile();
+ if(await existsVerified(h,e)){clearPart(e);ctx.completed(e,true);return}
+ resetRecord(e);
+ if(!e.br?.length){
+  clearPart(e);
+  await rawFile(h,e,ctx);
+ }else{
+  // The manifest's br array defines the number of CDN blocks. Their
+  // decompressed lengths vary; e.size is the size of the entire file.
+  const state=resumePart(e,before);
+  let offset=state?.size||0, next=state?.next||0;
+  if(!state && before.size!==0)await shrink(h,0);
+  if(!state && before.size===0)offset=0;
+  if(state && (offset>e.size || (next===e.br.length && offset!==e.size))){
+   offset=0;next=0;clearPart(e);await shrink(h,0);
+  }
+  ctx.progress(e,offset);
+  for(let i=next;i<e.br.length;i++){
+   if(ctx.cancelled?.())throw Error("Stahování pozastaveno");
+   const updated=await streamPart(h,e,i,offset,ctx);
+   if(i===e.br.length-1&&updated!==e.size)
+    throw Error("Poslední blok archivu skončil na "+updated+" z "+e.size+
+     " bajtů: "+e.path+" – server nevrátil celý soubor");
+   offset=updated;
+   markPart(e,i+1,await h.getFile());
+  }
  }
-}
-const finished=await h.getFile();
-if(finished.size!==e.size)throw Error("Neúplný "+e.path+": "+finished.size+"/"+e.size);
-ctx.status("Ověřuji SHA-256: "+e.path);
-const digest=await shaFile(finished);
-if(digest.toLowerCase()!==e.sha256.toLowerCase()){resetRecord(e);throw Error("SHA-256 nesouhlasí u "+e.path+"; soubor zůstává v úložišti pro další kontrolu")}
-record(e,finished);ctx.completed(e,false);
+ const finished=await h.getFile();
+ if(finished.size!==e.size)throw Error("Neúplný "+e.path+": "+finished.size+"/"+e.size);
+ ctx.status("Ověřuji SHA-256: "+e.path);
+ const digest=await shaFile(finished);
+ if(digest.toLowerCase()!==e.sha256.toLowerCase()){
+  resetRecord(e);clearPart(e);
+  throw Error("SHA-256 nesouhlasí u "+e.path+"; archiv musí být stažen znovu");
+ }
+ clearPart(e);record(e,finished);ctx.completed(e,false);
 }
 async function downloadAll(ctx){
 if(typeof window.bo1zSHA256!=="function")throw Error("Chybí streamovací SHA-256");
