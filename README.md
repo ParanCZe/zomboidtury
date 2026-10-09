@@ -13,3 +13,7 @@ This is a newly compiled experimental Zombies engine, not an iframe or a claim t
 The wasm uses unshared 512 MiB memory and Asyncify, portable OpenGL/WebGL rendering, raw-fastfile support, and touch input. Windows-only profiling, Steam/gamepad profile initialization and CPU affinity are disabled on web; these are not game simulation replacements. The game's Zombies simulation source is compiled into this build. Runtime initialization and a real Kino round on a physical iPhone have **not yet been verified**. Compilation and downloader tests alone do not establish gameplay compatibility.
 
 Run downloader tests with `node --test tests/kino-pack.test.cjs`. The downloaded assets come from `https://cdn.vel.gg/packs/kino/` using the pinned manifest; availability and use remain subject to the upstream provider and the asset owners. Existing licenses remain included.
+
+## Rebuilds from source
+
+The `Rebuild experimental mobile Zombies engine` workflow reconstructs the pinned web-port source, applies the complete source patch, runs input/math tests and compiles with Emscripten 3.1.69. It checks the Wasm, Asyncify exports and unshared 512 MiB initial memory, and uploads `experimental-mobile-zombies-engine` as an Actions artifact. Rebuilds run when the source patch or workflow changes; they can also be started manually. This artifact has the current player but does not include the 702 MiB game pack and is not automatically substituted into the live site. Graphics/gameplay still require testing on an actual supported browser.

@@ -1,0 +1,82 @@
+name: Rebuild experimental mobile Zombies engine
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - mobile-port.patch.gz
+      - .github/workflows/engine-build.yml
+permissions:
+  contents: read
+concurrency:
+  group: mobile-engine-build
+  cancel-in-progress: true
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    container: emscripten/emsdk:3.1.69
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore and apply pinned engine source
+        shell: bash
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/riicchhaarrd/KisakBlack.git engine-source
+          git -C engine-source checkout 65d1eb9a21898ae43b27f93e8204dc5d03560d70
+          gzip -dc mobile-port.patch.gz > engine.patch
+          git -C engine-source apply --check ../engine.patch
+          git -C engine-source apply ../engine.patch
+      - name: Verify portable input and file readers
+        shell: bash
+        run: |
+          cd engine-source
+          node tests/mobile_keys_test.cjs
+          g++ -std=c++20 tests/mobile_motion_test.cpp src/platform/sdl/mobile_motion.cpp -o /tmp/mobile-motion-test
+          /tmp/mobile-motion-test
+          g++ -std=c++20 tests/msg_round_float_test.cpp src/qcommon/msg_round_float.cpp -o /tmp/round-float-test
+          /tmp/round-float-test
+      - name: Compile unthreaded Asyncify engine
+        shell: bash
+        run: |
+          emcmake cmake -S engine-source -B engine-build -DCMAKE_BUILD_TYPE=Release -DKISAK_WEB_THREADS=OFF -DKISAK_WEB_ASSERTIONS=ON
+          cmake --build engine-build --parallel 4
+      - name: Validate compiled Wasm and package current player
+        shell: bash
+        run: |
+          node - <<'JS'
+          const fs = require('fs');
+          const bytes = fs.readFileSync('engine-build/web/blackops.wasm');
+          if (!WebAssembly.validate(bytes)) throw new Error('Invalid WebAssembly');
+          const compiled = new WebAssembly.Module(bytes);
+          const exportedNames = new Set(WebAssembly.Module.exports(compiled).map(e => e.name));
+          for (const name of ['__main_argc_argv', 'KBMobile_Reset', 'KBMobile_Enable', 'KBMobile_Key', 'KBMobile_Look', 'KBMobile_Pointer', 'asyncify_start_unwind', 'asyncify_stop_unwind']) {
+            if (!exportedNames.has(name)) throw new Error('Missing engine export: ' + name);
+          }
+          const imports = {};
+          for (const entry of WebAssembly.Module.imports(compiled)) {
+            if (entry.kind !== 'function') throw new Error('Unexpected non-function import: ' + entry.name);
+            imports[entry.module] ??= {};
+            imports[entry.module][entry.name] = () => 0;
+          }
+          const instance = new WebAssembly.Instance(compiled, imports);
+          const memory = Object.values(instance.exports).find(value => value instanceof WebAssembly.Memory);
+          if (!memory || memory.buffer instanceof SharedArrayBuffer || memory.buffer.byteLength !== 512 * 1048576) throw new Error('Expected unshared 512 MiB initial memory');
+          console.log('Wasm exports, Asyncify and unshared 512 MiB memory verified. Game initialization is not tested here.');
+          fs.mkdirSync('engine-artifact', {recursive:true});
+          for (const name of fs.readdirSync('.')) if (/\.(html|js|css)$/.test(name) && name !== 'blackops.js') fs.copyFileSync(name, 'engine-artifact/' + name);
+          fs.copyFileSync('engine-build/web/blackops.js', 'engine-artifact/blackops.js');
+          const partNames = [];
+          for (let offset = 0, part = 1; offset < bytes.length; offset += 7999998, part++) {
+            const name = 'blackops.wasm.' + String(part).padStart(3, '0');
+            partNames.push(name);
+            fs.writeFileSync('engine-artifact/' + name, bytes.subarray(offset, offset + 7999998));
+          }
+          const loader = fs.readFileSync('engine-artifact/engine-loader.js', 'utf8');
+          fs.writeFileSync('engine-artifact/engine-loader.js', loader.replace(/for \(const name of \[.*?\]\)/, 'for (const name of ' + JSON.stringify(partNames) + ')'));
+          fs.writeFileSync('engine-artifact/BUILD.json', JSON.stringify({source:'65d1eb9a21898ae43b27f93e8204dc5d03560d70', emscripten:'3.1.69', wasmBytes:bytes.length, commit:process.env.GITHUB_SHA, gameplayVerified:false}, null, 2));
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experimental-mobile-zombies-engine
+          path: engine-artifact/
+          retention-days: 14
