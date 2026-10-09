@@ -3,7 +3,7 @@
 <body><canvas id="game" width="960" height="540"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.6.8</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.6.9</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
@@ -14,7 +14,7 @@
 <p><small>Stahování probíhá postupně po jednotlivých souborech do OPFS /pack-kino. Po přerušení znovu ověří již hotové soubory. Soubory bez dostupných Brotli bloků se zatím přeskočí. Větší soubory nad 128 MB jsou v této verzi také pozastavené kvůli paměti iPhonu.</small></p>
 <div class="toolbar"><button id="chunkcheck" class="secondary" type="button">STÁHNOUT A OVĚŘIT IW_00</button></div>
 <div class="toolbar"><button id="assetcheck" class="secondary" type="button">OVĚŘIT HERNÍ DATA / OPFS</button></div><p><small>Test stáhne jen malý vzorek dat, nikoli celou mapu. Před plným stažením (~931 MB) ověříme oprávnění a kapacitu zařízení.</small></p>
-<div class="toolbar"><button id="boot" class="primary">SPUSTIT ORIGINÁLNÍ ENGINE</button><button id="show" class="secondary" type="button">Skrýt panel</button><button id="copy" class="secondary" type="button">Kopírovat protokol</button><button id="saveLog" class="secondary" type="button">Uložit log .txt</button></div>
+<div class="toolbar"><button id="boot" class="primary">SPUSTIT ORIGINÁLNÍ ENGINE</button><button id="show" class="secondary" type="button">Skrýt panel</button><button id="copy" class="secondary" type="button">Kopírovat protokol</button><button id="saveLog" class="secondary" type="button">Uložit log .txt</button><button id="restoreLog" class="secondary" type="button">Obnovit log po zamrznutí</button></div>
 <div id="status">Připraveno.</div><pre id="log">Připraveno. Nejprve vyber oba originální soubory.</pre>
 <small>Souborové binárky se pouze čtou lokálně; neposílají se na GitHub ani Cloudflare. Nahrání originálních mapových dat řešíme odděleně. Dotyková tlačítka fungují pouze ve chvíli, kdy přijímá originální runtime vstupy.</small>
 </div></div>
@@ -22,7 +22,10 @@
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id), canvas=$("game"),logs=[];let module=null,modURL=null,lastError="",held=new Set(),touchX=null,stickId=null,moveTimer=0;let booting=false;
-const log=(...msg)=>{let s=msg.map(x=>typeof x==="string"?x:String(x)).join(" ");logs.push(s);if(logs.length>280)logs.shift();$("log").textContent=logs.slice(-90).join("\n");$("log").scrollTop=$("log").scrollHeight;console.log("[BO1Z]",s)};
+const savedKey="bo1z-last-engine-log-v269";
+let sinceSave=0;
+const persistLog=()=>{try{localStorage.setItem(savedKey,logs.join("\n").slice(-150000))}catch{}};
+const log=(...msg)=>{let s=msg.map(x=>typeof x==="string"?x:String(x)).join(" ");logs.push(s);if(logs.length>400)logs.shift();$("log").textContent=logs.slice(-90).join("\n");$("log").scrollTop=$("log").scrollHeight;console.log("[BO1Z]",s);if(++sinceSave>=5||/ERROR|ERR |EXIT|ABORT|BOOT OPFS/.test(s)){sinceSave=0;persistLog()}};
 const stat=s=>$("status").textContent=s;
 const onerr=e=>log("GLOBAL ERROR",e?.message||e);window.addEventListener("error",onerr);window.addEventListener("unhandledrejection",e=>log("REJECTION",e.reason?.message||e.reason));
 function key(code,pressed){if(!module?._KB_Input)return;const id="k"+code;if(pressed===held.has(id))return;held[pressed?"add":"delete"](id);try{module._KB_Input(0,code,pressed?1:0)}catch(e){log("KEY ERROR",e.message)}}
@@ -58,6 +61,15 @@ $("mini").onclick=()=>showUI(true);$("show").onclick=()=>showUI(false);$("copy")
   stat(ok?"Protokol zkopírován záložní metodou.":"Schránka odmítla kopírování. Použij Uložit log .txt.");
  }
 };
+$("restoreLog").onclick=()=>{
+ try{
+  const previous=localStorage.getItem(savedKey);
+  if(!previous){stat("Zatím není uložený protokol.");return}
+  logs.length=0;logs.push(...previous.split("\n"));
+  $("log").textContent=logs.slice(-90).join("\n");
+  stat("Obnoven log z předchozího spuštění. Klikni Uložit log .txt.");
+ }catch(e){stat("Nelze obnovit log: "+e.message)}
+};
 $("saveLog").onclick=()=>{
  try{
   const content=logs.join("\n")||"BO1Z log is empty";
@@ -72,7 +84,7 @@ $("saveLog").onclick=()=>{
 $("assetcheck").onclick=async()=>{
 const btn=$("assetcheck");btn.disabled=true;stat("Test herních dat spuštěn – kontroluji OPFS a manifest…");log("ASSET BUTTON CLICKED");
 try{
-log("ASSET PREFLIGHT v2.6.8","origin",location.origin);
+log("ASSET PREFLIGHT v2.6.9","origin",location.origin);
 if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
 const estimate=await navigator.storage.estimate();
 log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
@@ -122,7 +134,7 @@ finally{btn.disabled=false}
 $("chunkcheck").onclick=async()=>{
  const btn=$("chunkcheck");btn.disabled=true;stat("Stahuji a ověřuji celý iw_00.iwd (cca 11 MB)…");
  try{
-  log("IW00 FULL VERIFY v2.6.8");
+  log("IW00 FULL VERIFY v2.6.9");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const mf=await mr.json(),entry=mf.files.find(f=>f.path==="main/iw_00.iwd");
@@ -158,7 +170,7 @@ $("chunkcheck").onclick=async()=>{
 $("rawtest").onclick=async()=>{
  const btn=$("rawtest");btn.disabled=true;stat("Ověřuji dostupnost malého nekomprimovaného FF souboru…");
  try {
-  log("RAW FF PREFLIGHT v2.6.8");
+  log("RAW FF PREFLIGHT v2.6.9");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const manifest=await mr.json();
@@ -200,7 +212,7 @@ $("downloadBoot").onclick=async()=>{
  const btn=$("downloadBoot");btn.disabled=true;
  try{
   const files=await manifestFiles(),root=await kinoRoot();let completed=0,skipped=0,bytesDone=0;
-  log("KINO DOWNLOADER v2.6.8",files.length,"boot files; resume per verified file");
+  log("KINO DOWNLOADER v2.6.9",files.length,"boot files; resume per verified file");
   for(const entry of files){
    if(downloadStopped)break;
    if(!entry.br?.length && !(entry.path.endsWith(".ff") && entry.size<=64*1048576)){log("UNSUPPORTED NO BR",entry.path);skipped++;continue}
@@ -235,7 +247,7 @@ $("downloadBoot").onclick=async()=>{
  }catch(e){log("KINO DOWNLOAD ERROR",e.name,e.message);stat("Stahování přerušeno: "+e.message)}
  finally{downloadActive=false;btn.disabled=false}
 };
-log("UI READY v2.6.8 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
+log("UI READY v2.6.9 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
 function patch(js){
 const substitutions=[
 ["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
@@ -265,7 +277,7 @@ const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
 if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.6.8",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.6.9",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
@@ -313,6 +325,10 @@ try{
  const packDir=await opfsBootRoot.getDirectoryHandle("pack-kino",{create:false});
  const mainDir=await packDir.getDirectoryHandle("main",{create:false});
  const mapDir=await (await packDir.getDirectoryHandle("zone",{create:false})).getDirectoryHandle("Common",{create:false});
+ const englishDir=await (await packDir.getDirectoryHandle("zone",{create:false})).getDirectoryHandle("english",{create:false});
+ const critical=await englishDir.getFileHandle("en_code_pre_gfx_mp.ff",{create:false});
+ const criticalFile=await critical.getFile();
+ log("CRITICAL OPFS FILE PRESENT","zone/english/en_code_pre_gfx_mp.ff",criticalFile.size,"bytes");
  const archive=await mainDir.getFileHandle("iw_00.iwd",{create:false});
  const mapAsset=await mapDir.getFileHandle("zombie_theater.ff",{create:false});
  log("BOOT OPFS CHECK","main/iw_00.iwd",(await archive.getFile()).size,"zone/Common/zombie_theater.ff",(await mapAsset.getFile()).size);
@@ -320,6 +336,7 @@ try{
  log("NOTE: Browser OPFS existence does not prove Emscripten filesystem mount; engine must mount /opfs itself");
 }catch(e){log("BOOT OPFS CHECK FAILED",e.name,e.message)}
 const args=['+set','fs_b','/opfs/pack-kino','+set','fs_h','/opfs/user','+set','kisak_zombies','1','+set','zombiemode','1','+set','r_webgpu','0','+set','r_fullscreen','0','+set','r_smp_backend','0','+set','r_aaSamples','1','+set','r_clear','0','+set','r_customMode',canvas.width+'x'+canvas.height,'+devmap',$("map").value];
+persistLog();
 log("RUN ORIGINAL MAIN",args.join(" "));
 stat("Spouštím originální main; panel nechávám otevřený kvůli dostupnosti logu.");
 log("BOOT UI SAFE MODE – panel remains visible throughout engine test");
