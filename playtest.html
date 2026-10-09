@@ -1,10 +1,17 @@
 <!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><meta name="theme-color" content="#060b12"><title>BO1Z – Original engine mobile boot</title>
-<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;touch-action:none;background:#030509;color:#f3f6ff;font:14px/1.45 -apple-system,system-ui,sans-serif}button,select,input{font:inherit}#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#000}#shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(#0007,transparent 24%,transparent 70%,#0006)}#dock{position:fixed;inset:0;pointer-events:none;display:none}#dock.show{display:block}#joystick{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:max(23px,env(safe-area-inset-left));width:clamp(103px,19vmin,160px);aspect-ratio:1;border:2px solid #f9ffff54;background:#ffffff19;border-radius:50%;pointer-events:auto;touch-action:none}#nub{position:absolute;width:42%;aspect-ratio:1;background:#ffffff9b;border-radius:50%;top:29%;left:29%;pointer-events:none}#actions{position:absolute;bottom:max(20px,env(safe-area-inset-bottom));right:max(18px,env(safe-area-inset-right));display:flex;align-items:flex-end;gap:10px;pointer-events:auto}.stack{display:flex;flex-direction:column;gap:10px}.touchbtn{border:2px solid #e5f3ff66;background:#52617e5a;color:#fff;font-size:11px;font-weight:900;width:60px;aspect-ratio:1;border-radius:50%;touch-action:none}#shoot{width:clamp(88px,17vmin,135px);background:#ae553b66;border-color:#eac39a;font-size:15px}#look{position:fixed;inset:0 0 0 42%;z-index:1;touch-action:none;pointer-events:none}#dock.show #look{pointer-events:auto}#dock.show #actions,#dock.show #joystick{z-index:3}#mini{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(15px,env(safe-area-inset-right));z-index:5;background:#0c152ad9;border:1px solid #ffffff44;border-radius:9px;padding:8px 11px;color:#cbd6e8;font-size:11px}#ui{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:#070d17ef;overflow:auto;padding:20px}#panel{width:min(100%,610px);max-height:94vh;overflow:auto;background:#101b2eea;border:1px solid #47607a;padding:20px;border-radius:18px;box-shadow:0 12px 60px #000c}h1{font-size:clamp(27px,5vw,40px);line-height:1.15;margin:6px 0 8px}p{color:#becada}small{color:#a4b6d0}label{display:block;margin:10px 0;color:#d6e2f8}input[type=file],select{display:block;width:100%;padding:9px;background:#081325;border:1px solid #3d5170;border-radius:9px;color:#eef3ff;margin-top:5px}button.primary{background:#e4bf82;color:#081323;font-size:16px;font-weight:900;border:0;border-radius:12px;padding:13px 20px}button.primary:disabled{opacity:.5}button.secondary{background:#263b54;color:white;border:1px solid #60728b;border-radius:10px;padding:9px 13px}pre{background:#030914;color:#c6d5ef;padding:12px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-radius:9px;max-height:180px;overflow:auto}.warning{border-left:3px solid #e0b276;padding:9px 12px;background:#34281785;color:#e9d6b9}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}#status{font-size:13px;color:#bce2e5;font-weight:700}@media(orientation:portrait){#joystick{width:98px}#shoot{width:82px}.touchbtn{width:49px;font-size:10px}#panel{padding:14px}} </style><script src="/webgl-compat.js?v=1"></script></head>
+<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;touch-action:none;background:#030509;color:#f3f6ff;font:14px/1.45 -apple-system,system-ui,sans-serif}button,select,input{font:inherit}#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#000}#shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(#0007,transparent 24%,transparent 70%,#0006)}#dock{position:fixed;inset:0;pointer-events:none;display:none}#dock.show{display:block}#joystick{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:max(23px,env(safe-area-inset-left));width:clamp(103px,19vmin,160px);aspect-ratio:1;border:2px solid #f9ffff54;background:#ffffff19;border-radius:50%;pointer-events:auto;touch-action:none}#nub{position:absolute;width:42%;aspect-ratio:1;background:#ffffff9b;border-radius:50%;top:29%;left:29%;pointer-events:none}#actions{position:absolute;bottom:max(20px,env(safe-area-inset-bottom));right:max(18px,env(safe-area-inset-right));display:flex;align-items:flex-end;gap:10px;pointer-events:auto}.stack{display:flex;flex-direction:column;gap:10px}.touchbtn{border:2px solid #e5f3ff66;background:#52617e5a;color:#fff;font-size:11px;font-weight:900;width:60px;aspect-ratio:1;border-radius:50%;touch-action:none}#shoot{width:clamp(88px,17vmin,135px);background:#ae553b66;border-color:#eac39a;font-size:15px}#look{position:fixed;inset:0 0 0 42%;z-index:1;touch-action:none;pointer-events:none}#dock.show #look{pointer-events:auto}#dock.show #actions,#dock.show #joystick{z-index:3}#mini{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(15px,env(safe-area-inset-right));z-index:5;background:#0c152ad9;border:1px solid #ffffff44;border-radius:9px;padding:8px 11px;color:#cbd6e8;font-size:11px}#ui{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:#070d17ef;overflow:auto;padding:20px}#panel{width:min(100%,610px);max-height:94vh;overflow:auto;background:#101b2eea;border:1px solid #47607a;padding:20px;border-radius:18px;box-shadow:0 12px 60px #000c}h1{font-size:clamp(27px,5vw,40px);line-height:1.15;margin:6px 0 8px}p{color:#becada}small{color:#a4b6d0}label{display:block;margin:10px 0;color:#d6e2f8}input[type=file],select{display:block;width:100%;padding:9px;background:#081325;border:1px solid #3d5170;border-radius:9px;color:#eef3ff;margin-top:5px}button.primary{background:#e4bf82;color:#081323;font-size:16px;font-weight:900;border:0;border-radius:12px;padding:13px 20px}button.primary:disabled{opacity:.5}button.secondary{background:#263b54;color:white;border:1px solid #60728b;border-radius:10px;padding:9px 13px}pre{background:#030914;color:#c6d5ef;padding:12px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-radius:9px;max-height:180px;overflow:auto}.warning{border-left:3px solid #e0b276;padding:9px 12px;background:#34281785;color:#e9d6b9}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}#status{font-size:13px;color:#bce2e5;font-weight:700}@media(orientation:portrait){#joystick{width:98px}#shoot{width:82px}.touchbtn{width:49px;font-size:10px}#panel{padding:14px}} </style><script src="/webgl-compat.js?v=1"></script><script src="/sha256-stream.js?v=1"></script><script src="/kino-full-download.js?v=1"></script></head>
 <body><canvas id="game" width="960" height="720"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · WEBGL COMPAT PLAYTEST v1</small><h1>Spustit BO1 Zombies – WebGL oprava</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
-<div class="warning">PRVNÍ HERNÍ BUILD: WASM je skutečně upravený pro webový renderer. Hratelnost zatím není ověřená na iPhonu. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
+<div id="ui"><div id="panel"><small>BO1Z · KINO DER TOTEN · FULL PACKAGE PLAYTEST v2</small><h1>Spustit BO1 Zombies – WebGL oprava</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div class="warning">Engine už překonal inicializaci Direct3D. Chyběl herní font <code>gamefonts_pc.iwi</code>; proto nyní doplňujeme všechny soubory uvedené v manifestu. Originální herní data se ukládají pouze do tohoto iPhonu. Plně hratelný start zatím nebyl potvrzen.</div>
+<div style="margin:16px 0;padding:12px;border-radius:12px;border:1px solid #ffffff39;background:#0c1725">
+<button id="fullStart" class="primary" type="button" style="width:100%;min-height:56px;font-weight:800">STÁHNOUT VŠECHNA DATA KINO A SPUSTIT HRU</button>
+<div class="toolbar"><button id="fullPause" class="secondary" type="button">Pozastavit stahování</button></div>
+<progress id="fullMeter" max="100" value="0" style="width:100%;height:16px"></progress>
+<div id="fullProgress" style="margin-top:8px;font-size:13px;overflow-wrap:anywhere">Stáhne všechny soubory z herního manifestu, včetně velkých archivů. Již uložené soubory znovu nestahuje.</div>
+</div>
+<details><summary style="cursor:pointer;padding:9px 0">Pokročilé možnosti a diagnostika</summary>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
 <small>iPhone / iPad: Výběr souborů neomezuji podle přípony, aby šly vybrat i soubory .wasm a .mjs v aplikaci Soubory.</small>
@@ -15,6 +22,7 @@
 <div class="toolbar"><button id="chunkcheck" class="secondary" type="button">STÁHNOUT A OVĚŘIT IW_00</button></div>
 <div class="toolbar"><button id="assetcheck" class="secondary" type="button">OVĚŘIT HERNÍ DATA / OPFS</button></div><p><small>Test stáhne jen malý vzorek dat, nikoli celou mapu. Před plným stažením (~931 MB) ověříme oprávnění a kapacitu zařízení.</small></p>
 <div class="toolbar"><button id="boot" class="primary">SPUSTIT OPRAVENÝ ENGINE</button><button id="show" class="secondary" type="button">Skrýt panel</button><button id="copyGfx" class="secondary" type="button">Kopírovat GFX diagnostiku</button><button id="copy" class="secondary" type="button">Kopírovat protokol</button><button id="saveLog" class="secondary" type="button">Uložit log .txt</button><button id="restoreLog" class="secondary" type="button">Obnovit log po zamrznutí</button></div>
+</details>
 <div id="status">Připraveno.</div><pre id="log">Připraveno. Nejprve vyber oba originální soubory.</pre>
 <small>Souborové binárky se pouze čtou lokálně; neposílají se na GitHub ani Cloudflare. Nahrání originálních mapových dat řešíme odděleně. Dotyková tlačítka fungují pouze ve chvíli, kdy přijímá originální runtime vstupy.</small>
 </div></div>
@@ -280,7 +288,38 @@ $("downloadBoot").onclick=async()=>{
  }catch(e){log("KINO DOWNLOAD ERROR",e.name,e.message);stat("Stahování přerušeno: "+e.message)}
  finally{downloadActive=false;btn.disabled=false}
 };
-log("UI READY PLAYTEST v1.0 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
+let fullBusy=false,fullCancelled=false;
+$("fullPause").onclick=()=>{fullCancelled=true;stat("Pozastavuji po nejbližším dokončeném bloku…");};
+$("fullStart").onclick=async()=>{
+ if(fullBusy||booting||downloadActive)return;
+ fullBusy=true;fullCancelled=false;
+ const btn=$("fullStart");btn.disabled=true;
+ const prog=$("fullProgress"),meter=$("fullMeter");meter.value=0;
+ try{
+  if(typeof window.bo1zDownloadAllKino!=="function")throw Error("Chybí modul kompletního stahování.");
+  prog.textContent="Zjišťuji soubory manifestu a kontroluji úložiště…";
+  const result=await window.bo1zDownloadAllKino({
+   cancelled:()=>fullCancelled,
+   status:msg=>{prog.textContent=msg;stat(msg)},
+   log:(...args)=>log(...args),
+   progress:({path,done,total,filesDone,filesTotal,fileBytes,fileSize})=>{
+    const percent=Math.min(100,Math.round(done/total*1000)/10);meter.value=percent;
+    prog.textContent="Hotovo "+percent+" % · "+filesDone+"/"+filesTotal+" souborů · "+(done/1048576).toFixed(1)+" / "+(total/1048576).toFixed(1)+" MiB · "+path+" "+Math.round(fileBytes/fileSize*100)+" %";
+   }
+  });
+  prog.textContent="Všechny soubory manifestu ověřeny ("+result.files+"); spouštím Kino der Toten.";
+  await loadEngineCache();
+  if(!($("mjs").files[0]||cachedEngine.mjs)||!($("wasm").files[0]||cachedEngine.wasm))
+    throw Error("Data jsou připravená. Pro první start nyní vyber původní .mjs a .wasm v Pokročilých možnostech.");
+  log("FULL PACKAGE READY: BOOT",result.files,result.bytes);
+  $("boot").click();
+ }catch(e){
+  log("FULL PACKAGE STOPPED",e.message);
+  prog.textContent="Nedokončeno: "+e.message+" Po opětovném spuštění stahování naváže.";
+  stat("Balíček není kompletní: "+e.message);
+ }finally{fullBusy=false;btn.disabled=false}
+};
+log("UI READY FULL PLAYTEST v2 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
 function patch(js){
 const substitutions=[
 ["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
@@ -336,7 +375,7 @@ const wasmFile=$("wasm").files[0]||cachedEngine.wasm,mjsFile=$("mjs").files[0]||
 if(!wasmFile||!mjsFile){stat("Vyber oba soubory jednou, potom se budou načítat automaticky.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;graphicsLines.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE PLAYTEST v1.0",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – KINO FULL PLAYTEST v2",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
