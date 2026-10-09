@@ -3,7 +3,7 @@
 <body><canvas id="game" width="960" height="720"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT AUTO v1.1</small><h1>BO1Z automatický test</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT AUTO v1.2</small><h1>BO1Z automatický test</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
@@ -23,6 +23,30 @@
 "use strict";
 const $=id=>document.getElementById(id), canvas=$("game"),logs=[],auditLines=[];let module=null,modURL=null,lastError="",held=new Set(),touchX=null,stickId=null,moveTimer=0;let booting=false;
 const savedKey="bo1z-last-engine-log-v269";
+let cachedEngine={mjs:null,wasm:null};
+async function engineCacheRoot(){const root=await navigator.storage.getDirectory();return root.getDirectoryHandle("bo1z-local-engine",{create:true})}
+async function loadEngineCache(){
+ try{const root=await engineCacheRoot();
+  for(const [key,name] of [["mjs","engine.mjs"],["wasm","engine.wasm"]]){
+   try{const f=await (await root.getFileHandle(name)).getFile();if(f.size>0)cachedEngine[key]=f}catch(e){if(e?.name!=="NotFoundError")throw e}
+  }
+  if(cachedEngine.mjs&&cachedEngine.wasm)stat("Originální engine uložen v iPhonu. Příště stačí pouze spustit test.");
+ }catch(e){log("ENGINE LOCAL CACHE READ ERROR",e.message)}
+}
+async function saveEngineCache(){
+ try{const root=await engineCacheRoot();
+  for(const [key,name] of [["mjs","engine.mjs"],["wasm","engine.wasm"]]){
+   const file=$(key).files[0];if(!file)continue;
+   const handle=await root.getFileHandle(name,{create:true});
+   const writer=await handle.createWritable();await writer.write(file);await writer.close();
+   cachedEngine[key]=await handle.getFile();
+   log("ENGINE CACHED LOCAL",name,cachedEngine[key].size);
+  }
+ }catch(e){log("ENGINE LOCAL CACHE WRITE ERROR",e.message)}
+}
+for(const key of ["mjs","wasm"])$(key).addEventListener("change",()=>{void saveEngineCache()});
+void loadEngineCache();
+
 let sinceSave=0;
 const persistLog=()=>{try{localStorage.setItem(savedKey,logs.join("\n").slice(-150000))}catch{}};
 const log=(...msg)=>{let s=msg.map(x=>typeof x==="string"?x:String(x)).join(" ");logs.push(s);if(/ORIGINAL WASM COMPILED|MEMORY ALLOCATED|WASM INSTANCE \\+ REAL IMPORTS OK|BOOT OPFS CHECK main|4512 files in iwd files|WEBGL2 PREFLIGHT OK|WORKER WEBGL2 PREFLIGHT|BO1Z GL REAL CONTEXT|Creating Direct3D device|Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed|BOOT ERROR|MAIN ERROR|WASM INIT ERROR/i.test(s)){auditLines.push(s);if(auditLines.length>220)auditLines.shift()}if(/BO1Z GL REAL CONTEXT|BO1Z GL CREATE|GRAPHICS GLUE SOURCE|GFX WORKER HOOK|BO1Z GFX WORKER|GFX BRIDGE|WEBGL2 PREFLIGHT|WORKER WEBGL2|CANVAS TRANSFER|CANVAS OWNERSHIP|CreateDevice|Direct3D unavailable|Couldn\x27t initialize renderer|WebGL renderer initialization failed/i.test(s)){graphicsLines.push(s);if(graphicsLines.length>160)graphicsLines.shift()}if(logs.length>400)logs.shift();$("log").textContent=logs.slice(-90).join("\n");$("log").scrollTop=$("log").scrollHeight;console.log("[BO1Z]",s);if(++sinceSave>=5||/ERROR|ERR |EXIT|ABORT|BOOT OPFS/.test(s)){sinceSave=0;persistLog()}};
@@ -93,7 +117,7 @@ $("saveLog").onclick=()=>{
 $("assetcheck").onclick=async()=>{
 const btn=$("assetcheck");btn.disabled=true;stat("Test herních dat spuštěn – kontroluji OPFS a manifest…");log("ASSET BUTTON CLICKED");
 try{
-log("ASSET PREFLIGHT AUTO v1.1","origin",location.origin);
+log("ASSET PREFLIGHT AUTO v1.2","origin",location.origin);
 if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
 const estimate=await navigator.storage.estimate();
 log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
@@ -143,7 +167,7 @@ finally{btn.disabled=false}
 $("chunkcheck").onclick=async()=>{
  const btn=$("chunkcheck");btn.disabled=true;stat("Stahuji a ověřuji celý iw_00.iwd (cca 11 MB)…");
  try{
-  log("IW00 FULL VERIFY AUTO v1.1");
+  log("IW00 FULL VERIFY AUTO v1.2");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const mf=await mr.json(),entry=mf.files.find(f=>f.path==="main/iw_00.iwd");
@@ -179,7 +203,7 @@ $("chunkcheck").onclick=async()=>{
 $("rawtest").onclick=async()=>{
  const btn=$("rawtest");btn.disabled=true;stat("Ověřuji dostupnost malého nekomprimovaného FF souboru…");
  try {
-  log("RAW FF PREFLIGHT AUTO v1.1");
+  log("RAW FF PREFLIGHT AUTO v1.2");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const manifest=await mr.json();
@@ -221,7 +245,7 @@ $("downloadBoot").onclick=async()=>{
  const btn=$("downloadBoot");btn.disabled=true;
  try{
   const files=await manifestFiles(),root=await kinoRoot();let completed=0,skipped=0,bytesDone=0;
-  log("KINO DOWNLOADER AUTO v1.1",files.length,"boot files; resume per verified file");
+  log("KINO DOWNLOADER AUTO v1.2",files.length,"boot files; resume per verified file");
   for(const entry of files){
    if(downloadStopped)break;
    if(!entry.br?.length && !(entry.path.endsWith(".ff") && entry.size<=64*1048576)){log("UNSUPPORTED NO BR",entry.path);skipped++;continue}
@@ -256,7 +280,7 @@ $("downloadBoot").onclick=async()=>{
  }catch(e){log("KINO DOWNLOAD ERROR",e.name,e.message);stat("Stahování přerušeno: "+e.message)}
  finally{downloadActive=false;btn.disabled=false}
 };
-log("UI READY AUTO v1.1 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
+log("UI READY AUTO v1.2 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
 function patch(js){
 const substitutions=[
 ["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
@@ -307,11 +331,11 @@ return js;
 }
 $("boot").onclick=async()=>{
 if(booting)return;
-const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
-if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
+const wasmFile=$("wasm").files[0]||cachedEngine.wasm,mjsFile=$("mjs").files[0]||cachedEngine.mjs;
+if(!wasmFile||!mjsFile){stat("Vyber oba soubory jednou, potom se budou načítat automaticky.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;graphicsLines.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE AUTO v1.1",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE AUTO v1.2",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
@@ -455,14 +479,14 @@ function autoSummary(){
  ];
  const failed=hit(/Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed/);
  const important=[...auditLines,...graphicsLines].filter(x=>/BO1Z GL REAL CONTEXT|BO1Z GL CREATE|GRAPHICS GLUE SOURCE|GFX WORKER HOOK|BO1Z GFX WORKER|CreateDevice|Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed|BOOT ERROR|WASM INIT ERROR/i.test(x));
- autoReport="BO1Z AUTO TEST v1.1\n"+new Date().toISOString()+"\n\n"+rows.map(([name,ok,extra])=>(ok?"PASS ":"CHECK ")+name+" – "+extra).join("\n")+"\n\n"+(failed?"BLOKACE: CreateDevice selhal. Hra není spustitelná.":"Grafický start nebyl potvrzen; nepovažovat za úspěšný herní start.")+"\n\nRENDERER DIAGNOSTIKA\n"+important.slice(-70).join("\n");
+ autoReport="BO1Z AUTO TEST v1.2\n"+new Date().toISOString()+"\n\n"+rows.map(([name,ok,extra])=>(ok?"PASS ":"CHECK ")+name+" – "+extra).join("\n")+"\n\n"+(failed?"BLOKACE: CreateDevice selhal. Hra není spustitelná.":"Grafický start nebyl potvrzen; nepovažovat za úspěšný herní start.")+"\n\nRENDERER DIAGNOSTIKA\n"+important.slice(-70).join("\n");
  $("summary").textContent=autoReport;
  try{localStorage.setItem("bo1z-autotest-last",autoReport)}catch{}
  return autoReport;
 }
 $("autoStart").onclick=async()=>{
  if(autoRunning||booting)return;
- if(!$("mjs").files[0]||!$("wasm").files[0]){stat("Nejdřív vyber oba původní soubory .mjs a .wasm.");return}
+ await loadEngineCache();if(!($("mjs").files[0]||cachedEngine.mjs)||!($("wasm").files[0]||cachedEngine.wasm)){stat("Vyber oba originální soubory jen jednou; potom už zůstanou uložené v iPhonu.");return}
  autoRunning=true;$("autoStart").disabled=true;
  auditLines.length=0;graphicsLines.length=0;$("summary").textContent="Autotest běží: nejprve ověření WASM, potom start originálního enginu (cca 15 sekund).";
  $("boot").click();
