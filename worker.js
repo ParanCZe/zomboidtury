@@ -103,6 +103,25 @@ export default {
         }});
       }catch(e){return new Response("Chunk proxy error: "+(e?.message||"unknown"),{status:502});}
     }
+    if (url.pathname === "/api/kino/raw-test") {
+      const path = "zone/english/en_code_pre_gfx_mp.ff";
+      const expectedSize = 2016;
+      const upstreamURL = "https://cdn.vel.gg/packs/kino/" + path;
+      try {
+        const upstream = await fetch(upstreamURL, { redirect: "manual" });
+        if (!upstream.ok) return new Response("RAW upstream HTTP " + upstream.status + " URL " + upstreamURL, {status: 502});
+        const bytes = await upstream.arrayBuffer();
+        if (bytes.byteLength > 32768) return new Response("RAW test exceeds size limit", {status:502});
+        return new Response(bytes, {headers:{
+          "Content-Type":"application/octet-stream",
+          "X-BO1Z-Expected-Size":String(expectedSize),
+          "Cross-Origin-Resource-Policy":"same-origin",
+          "Cross-Origin-Opener-Policy":"same-origin",
+          "Cross-Origin-Embedder-Policy":"require-corp",
+          "X-Content-Type-Options":"nosniff"
+        }});
+      } catch(e) {return new Response("RAW test failed: "+(e?.message||"unknown"),{status:502});}
+    }
     // Restrict repository and deployment internals even if an ignore rule is misconfigured.
     if (/(^|\/)\.(?:git|wrangler|env)(?:\/|$)/i.test(url.pathname) ||
         /(?:^|\/)(?:wrangler\.jsonc?|package(?:-lock)?\.json|worker\.js|\.assetsignore)(?:$|\/)/i.test(url.pathname)) {
