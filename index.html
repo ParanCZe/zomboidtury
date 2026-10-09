@@ -77,7 +77,7 @@
       };
       addEventListener('error',e=>record('CHYBA: '+e.message));
       addEventListener('unhandledrejection',e=>record('ODMÍTNUTO: '+String(e.reason?.stack||e.reason)));
-      document.getElementById('canvas').addEventListener('webglcontextlost',()=>record('WebGL: ztracený kontext'));
+      addEventListener('DOMContentLoaded',()=>document.getElementById('canvas').addEventListener('webglcontextlost',()=>record('WebGL: ztracený kontext')));
     })();
   </script>
   <!-- Audio autoplay-policy unlock: the browser creates the OpenAL AudioContext SUSPENDED until a
