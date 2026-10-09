@@ -151,8 +151,19 @@ export default {
         /(?:^|\/)(?:wrangler\.jsonc?|package(?:-lock)?\.json|worker\.js|\.assetsignore)(?:$|\/)/i.test(url.pathname)) {
       return new Response("Not found", { status: 404 });
     }
-    const response = await env.ASSETS.fetch(request);
+    // Serve the AutoTest as an actual HTML document on iOS, even when the asset
+    // layer assigns a generic downloadable MIME type to .html files.
+    const isAutoTest = url.pathname === "/autotest" || url.pathname === "/autotest.html";
+    const assetRequest = isAutoTest && url.pathname === "/autotest"
+      ? new Request(new URL("/autotest.html", url), request)
+      : request;
+    const response = await env.ASSETS.fetch(assetRequest);
     const headers = new Headers(response.headers);
+    if (isAutoTest && response.ok) {
+      headers.set("Content-Type", "text/html; charset=utf-8");
+      headers.delete("Content-Disposition");
+      headers.set("Cache-Control", "no-store");
+    }
     headers.set("Cross-Origin-Opener-Policy", "same-origin");
     headers.set("Cross-Origin-Embedder-Policy", "require-corp");
     headers.set("Cross-Origin-Resource-Policy", "same-origin");
