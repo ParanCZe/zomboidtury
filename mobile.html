@@ -47,6 +47,10 @@ const substitutions=[
 ["WebAssembly.promising(getWasmTableEntry(ptr))(arg)","getWasmTableEntry(ptr)(arg)","JSPI thread callback disabled"]
 ];
 for(const [a,b,name] of substitutions){if(!js.includes(a))throw Error("Předloha nepodporuje patch: "+name);js=js.replaceAll(a,b);log("PATCH",name)}
+const memoryCtor='wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:INITIAL_MEMORY/65536,shared:true})';
+if(!js.includes(memoryCtor))throw Error("Nenalezen původní konstruktor WASM paměti");
+js=js.replace(memoryCtor,'wasmMemory=Module["wasmMemory"]||new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:INITIAL_MEMORY/65536,shared:true})');
+log("PATCH initMemory používá předanou wasmMemory; žádná druhá alokace");
 const start="function __asyncjs__InitializeWebGPU(pipeline){",end='__asyncjs__InitializeWebGPU.sig="ii"';const a=js.indexOf(start),b=js.indexOf(end,a);
 if(a<0||b<0)throw Error("WebGPU init nenalezen");
 js=js.slice(0,a)+'function __asyncjs__InitializeWebGPU(pipeline){console.warn("BO1Z mobile forced WebGL2 fallback");return 0}'+js.slice(b);
@@ -59,7 +63,7 @@ const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
 if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5.2",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
