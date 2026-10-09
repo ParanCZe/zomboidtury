@@ -3,12 +3,14 @@
 <body><canvas id="game" width="960" height="540"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.6.2</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.6.3</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
 <small>iPhone / iPad: Výběr souborů neomezuji podle přípony, aby šly vybrat i soubory .wasm a .mjs v aplikaci Soubory.</small>
 <label>Mapa <select id="map"><option value="zombie_theater">Kino der Toten</option><option value="zombie_pentagon">Five</option><option value="zombie_cod5_prototype">Nacht der Untoten</option></select></label>
+<div class="toolbar"><button id="downloadBoot" class="primary" type="button">STÁHNOUT BOOT DATA KINO</button><button id="stopDownload" class="secondary" type="button">POZASTAVIT</button><button id="scanDownload" class="secondary" type="button">STAV STAŽENÍ</button></div>
+<p><small>Stahování probíhá postupně po jednotlivých souborech do OPFS /pack-kino. Po přerušení znovu ověří již hotové soubory. Soubory bez dostupných Brotli bloků se zatím přeskočí. Větší soubory nad 128 MB jsou v této verzi také pozastavené kvůli paměti iPhonu.</small></p>
 <div class="toolbar"><button id="chunkcheck" class="secondary" type="button">STÁHNOUT A OVĚŘIT IW_00</button></div>
 <div class="toolbar"><button id="assetcheck" class="secondary" type="button">OVĚŘIT HERNÍ DATA / OPFS</button></div><p><small>Test stáhne jen malý vzorek dat, nikoli celou mapu. Před plným stažením (~931 MB) ověříme oprávnění a kapacitu zařízení.</small></p>
 <div class="toolbar"><button id="boot" class="primary">SPUSTIT ORIGINÁLNÍ ENGINE</button><button id="show" class="secondary" type="button">Skrýt panel</button><button id="copy" class="secondary" type="button">Kopírovat protokol</button></div>
@@ -43,7 +45,7 @@ $("mini").onclick=()=>showUI(true);$("show").onclick=()=>showUI(false);$("copy")
 $("assetcheck").onclick=async()=>{
 const btn=$("assetcheck");btn.disabled=true;stat("Test herních dat spuštěn – kontroluji OPFS a manifest…");log("ASSET BUTTON CLICKED");
 try{
-log("ASSET PREFLIGHT v2.6.2","origin",location.origin);
+log("ASSET PREFLIGHT v2.6.3","origin",location.origin);
 if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
 const estimate=await navigator.storage.estimate();
 log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
@@ -93,7 +95,7 @@ finally{btn.disabled=false}
 $("chunkcheck").onclick=async()=>{
  const btn=$("chunkcheck");btn.disabled=true;stat("Stahuji a ověřuji celý iw_00.iwd (cca 11 MB)…");
  try{
-  log("IW00 FULL VERIFY v2.6.2");
+  log("IW00 FULL VERIFY v2.6.3");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const mf=await mr.json(),entry=mf.files.find(f=>f.path==="main/iw_00.iwd");
@@ -126,7 +128,66 @@ $("chunkcheck").onclick=async()=>{
  }catch(e){log("IW00 VERIFY ERROR",e.name,e.message);stat("Ověření iw_00 selhalo: "+e.message)}
  finally{btn.disabled=false}
 };
-log("UI READY v2.6.2 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
+let downloadStopped=false,downloadActive=false;
+const toHex=buf=>[...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,"0")).join("");
+async function kinoRoot(){const r=await navigator.storage.getDirectory();return await r.getDirectoryHandle("pack-kino",{create:true})}
+async function kinoHandle(root,path,create){const pieces=path.split("/");let dir=root;for(const p of pieces.slice(0,-1))dir=await dir.getDirectoryHandle(p,{create});return dir.getFileHandle(pieces.at(-1),{create})}
+async function verifyFile(handle,entry){const file=await handle.getFile();if(file.size!==entry.size)return false;const digest=toHex(await crypto.subtle.digest("SHA-256",await file.arrayBuffer()));return digest===entry.sha256}
+async function manifestFiles(){
+ const resp=await fetch("/api/kino/manifest",{cache:"no-store"});
+ if(!resp.ok)throw Error("Manifest HTTP "+resp.status);
+ const mf=await resp.json();if(mf.map!=="zombie_theater")throw Error("Wrong manifest map");
+ return mf.files.filter(x=>x.class==="boot");
+}
+$("stopDownload").onclick=()=>{downloadStopped=true;stat("Pozastavuji po dokončení právě stahované části…");log("DOWNLOAD PAUSE REQUESTED")};
+$("scanDownload").onclick=async()=>{try{
+ const files=await manifestFiles(),root=await kinoRoot();let complete=0,bytes=0,unsupported=0;
+ for(const entry of files){if(!entry.br?.length||entry.size>128*1048576){unsupported++;continue}
+ try{const h=await kinoHandle(root,entry.path,false);if(await verifyFile(h,entry)){complete++;bytes+=entry.size}}catch(e){if(e.name!=="NotFoundError")throw e}
+ }
+ log("KINO BOOT STATUS",complete,"files verified",bytes,"bytes;",unsupported,"files unsupported/too large; total",files.length);
+ stat("Ověřeno "+complete+" / "+files.length+" boot souborů.");
+ }catch(e){log("SCAN ERROR",e.name,e.message)}};
+$("downloadBoot").onclick=async()=>{
+ if(downloadActive)return;downloadActive=true;downloadStopped=false;
+ const btn=$("downloadBoot");btn.disabled=true;
+ try{
+  const files=await manifestFiles(),root=await kinoRoot();let completed=0,skipped=0,bytesDone=0;
+  log("KINO DOWNLOADER v2.6.3",files.length,"boot files; resume per verified file");
+  for(const entry of files){
+   if(downloadStopped)break;
+   if(!entry.br?.length){log("UNSUPPORTED NO BR",entry.path);skipped++;continue}
+   if(entry.size>128*1048576){log("DEFERRED MEMORY LIMIT",entry.path,entry.size);skipped++;continue}
+   const h=await kinoHandle(root,entry.path,true);
+   if(await verifyFile(h,entry)){completed++;bytesDone+=entry.size;log("RESUME VERIFIED",entry.path);continue}
+   log("DOWNLOADING",entry.path,"size",entry.size,"chunks",entry.br.length);
+   const partial=await h.createWritable();let offset=0,failed=false;
+   try{
+    for(let i=0;i<entry.br.length;i++){
+     if(downloadStopped){failed=true;break}
+     const u="/api/kino/chunk?path="+encodeURIComponent(entry.path)+"&part="+i;
+     const response=await fetch(u);
+     if(!response.ok)throw Error("HTTP "+response.status+" "+(await response.text()).slice(0,120));
+     const bytes=await response.arrayBuffer();
+     const expected=Math.min(8388608,entry.size-offset);
+     if(bytes.byteLength!==expected)throw Error("Chunk size mismatch "+bytes.byteLength+" expected "+expected+" at "+i);
+     await partial.write({type:"write",position:offset,data:bytes});
+     offset+=bytes.byteLength;
+     stat(entry.path+" – "+Math.round(offset/entry.size*100)+"% ("+completed+"/"+files.length+")");
+    }
+    await partial.close();
+   }catch(e){failed=true;try{await partial.abort()}catch{}throw e}
+   if(failed){try{await partial.abort()}catch{}break}
+   if(offset!==entry.size||!(await verifyFile(h,entry)))throw Error("SHA-256 FAILED "+entry.path);
+   completed++;bytesDone+=entry.size;
+   log("KINO FILE VERIFIED",entry.path,entry.size);
+  }
+  log("KINO DOWNLOAD STOP", "verified this pass",completed,"deferred",skipped,"bytes",bytesDone,"paused",downloadStopped);
+  stat(downloadStopped?"Pozastaveno; spusť znovu pro pokračování.":"Stahování dokončilo dostupné soubory; další zbývají nepodporované.");
+ }catch(e){log("KINO DOWNLOAD ERROR",e.name,e.message);stat("Stahování přerušeno: "+e.message)}
+ finally{downloadActive=false;btn.disabled=false}
+};
+log("UI READY v2.6.3 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
 function patch(js){
 const substitutions=[
 ["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
@@ -156,7 +217,7 @@ const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
 if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.6.2",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.6.3",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
