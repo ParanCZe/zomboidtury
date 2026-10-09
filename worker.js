@@ -5,9 +5,10 @@ export default {
       try {
         const upstream = await fetch("https://vel.gg/bo1z/kino/manifest.json", {
           headers: { "Accept": "application/json" },
-          redirect: "error",
+          redirect: "manual",
           cf: { cacheTtl: 120, cacheEverything: true }
         });
+        if (upstream.status >= 300 && upstream.status < 400) return new Response("Upstream redirect " + upstream.status + " (not followed)", { status: 502 });
         if (!upstream.ok) return new Response("Upstream HTTP " + upstream.status, { status: 502 });
         const content = await upstream.text();
         if (content.length > 500000) return new Response("Manifest too large", { status: 502 });
