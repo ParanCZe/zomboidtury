@@ -122,6 +122,30 @@ export default {
         }});
       } catch(e) {return new Response("RAW test failed: "+(e?.message||"unknown"),{status:502});}
     }
+    if (url.pathname === "/api/kino/raw") {
+      try {
+        const path = url.searchParams.get("path") || "";
+        if (!/^[a-zA-Z0-9_./-]{1,160}$/.test(path) || path.includes("..")) return new Response("Invalid path",{status:400});
+        const mr=await fetch("https://vel.gg/bo1z/kino/manifest.json",{redirect:"manual",cf:{cacheTtl:120,cacheEverything:true}});
+        if(!mr.ok)throw new Error("Manifest HTTP "+mr.status);
+        const mf=await mr.json();
+        if(mf.map!=="zombie_theater" || !Array.isArray(mf.files))throw new Error("Unexpected manifest");
+        const entry=mf.files.find(x=>x.path===path);
+        if(!entry || entry.class!=="boot" || (Array.isArray(entry.br)&&entry.br.length) || entry.size>64*1048576 || !path.endsWith(".ff")) return new Response("Raw file not allowed",{status:404});
+        const upstream=await fetch("https://cdn.vel.gg/packs/kino/"+path,{redirect:"manual"});
+        if(!upstream.ok || upstream.status>=300&&upstream.status<400)return new Response("CDN HTTP "+upstream.status,{status:502});
+        const bytes=await upstream.arrayBuffer();
+        if(bytes.byteLength!==entry.size)return new Response("Raw size mismatch",{status:502});
+        return new Response(bytes,{headers:{
+          "Content-Type":"application/octet-stream",
+          "Cache-Control":"public, max-age=300",
+          "Cross-Origin-Resource-Policy":"same-origin",
+          "Cross-Origin-Opener-Policy":"same-origin",
+          "Cross-Origin-Embedder-Policy":"require-corp",
+          "X-Content-Type-Options":"nosniff"
+        }});
+      }catch(e){return new Response("Raw proxy failed: "+(e?.message||"unknown"),{status:502});}
+    }
     // Restrict repository and deployment internals even if an ignore rule is misconfigured.
     if (/(^|\/)\.(?:git|wrangler|env)(?:\/|$)/i.test(url.pathname) ||
         /(?:^|\/)(?:wrangler\.jsonc?|package(?:-lock)?\.json|worker\.js|\.assetsignore)(?:$|\/)/i.test(url.pathname)) {
