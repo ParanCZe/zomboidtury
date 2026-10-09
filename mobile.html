@@ -61,7 +61,8 @@ try{
 }catch(e){log("MANIFEST WORKER ERROR",e.message);return}
 const entry=manifest.files.find(f=>f.path==="localization.txt");
 if(!entry)throw Error("V manifestu chybí localization.txt");
-const sampleURL="https://cdn.vel.gg/packs/kino/localization.txt.br/0?v="+entry.sha256.slice(0,16);\nlog("CDN SAMPLE (experimental URL)",sampleURL);
+const sampleURL="https://cdn.vel.gg/packs/kino/localization.txt.br/0?v="+entry.sha256.slice(0,16);
+log("CDN SAMPLE (experimental URL)",sampleURL);
 try{const r=await fetch(sampleURL,{cache:"no-store"});if(!r.ok)throw Error("HTTP "+r.status);const buf=await r.arrayBuffer();log("CDN SAMPLE CORS OK",buf.byteLength,"bytes","Content-Encoding",r.headers.get("content-encoding")||"none");
 }catch(e){log("CDN SAMPLE CORS BLOCKED",e.message)}
 } catch(e){log("PREFLIGHT ERROR",e.name,e.message)}
