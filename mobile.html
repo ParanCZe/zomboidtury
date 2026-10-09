@@ -3,7 +3,7 @@
 <body><canvas id="game" width="960" height="540"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.6.9</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.7.0</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
@@ -84,7 +84,7 @@ $("saveLog").onclick=()=>{
 $("assetcheck").onclick=async()=>{
 const btn=$("assetcheck");btn.disabled=true;stat("Test herních dat spuštěn – kontroluji OPFS a manifest…");log("ASSET BUTTON CLICKED");
 try{
-log("ASSET PREFLIGHT v2.6.9","origin",location.origin);
+log("ASSET PREFLIGHT v2.7.0","origin",location.origin);
 if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
 const estimate=await navigator.storage.estimate();
 log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
@@ -134,7 +134,7 @@ finally{btn.disabled=false}
 $("chunkcheck").onclick=async()=>{
  const btn=$("chunkcheck");btn.disabled=true;stat("Stahuji a ověřuji celý iw_00.iwd (cca 11 MB)…");
  try{
-  log("IW00 FULL VERIFY v2.6.9");
+  log("IW00 FULL VERIFY v2.7.0");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const mf=await mr.json(),entry=mf.files.find(f=>f.path==="main/iw_00.iwd");
@@ -170,7 +170,7 @@ $("chunkcheck").onclick=async()=>{
 $("rawtest").onclick=async()=>{
  const btn=$("rawtest");btn.disabled=true;stat("Ověřuji dostupnost malého nekomprimovaného FF souboru…");
  try {
-  log("RAW FF PREFLIGHT v2.6.9");
+  log("RAW FF PREFLIGHT v2.7.0");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const manifest=await mr.json();
@@ -212,7 +212,7 @@ $("downloadBoot").onclick=async()=>{
  const btn=$("downloadBoot");btn.disabled=true;
  try{
   const files=await manifestFiles(),root=await kinoRoot();let completed=0,skipped=0,bytesDone=0;
-  log("KINO DOWNLOADER v2.6.9",files.length,"boot files; resume per verified file");
+  log("KINO DOWNLOADER v2.7.0",files.length,"boot files; resume per verified file");
   for(const entry of files){
    if(downloadStopped)break;
    if(!entry.br?.length && !(entry.path.endsWith(".ff") && entry.size<=64*1048576)){log("UNSUPPORTED NO BR",entry.path);skipped++;continue}
@@ -247,7 +247,7 @@ $("downloadBoot").onclick=async()=>{
  }catch(e){log("KINO DOWNLOAD ERROR",e.name,e.message);stat("Stahování přerušeno: "+e.message)}
  finally{downloadActive=false;btn.disabled=false}
 };
-log("UI READY v2.6.9 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
+log("UI READY v2.7.0 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
 function patch(js){
 const substitutions=[
 ["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
@@ -265,6 +265,14 @@ const alreadyTransferred='if(canvas.controlTransferredOffscreen){err(`pthread_cr
 if(!js.includes(alreadyTransferred))throw Error("Nenalezena Emscripten canvas-transfer větev");
 js=js.replace(alreadyTransferred,'if(canvas.controlTransferredOffscreen){console.warn("BO1Z: canvas already owned by another worker; spawn this worker without canvas transfer");continue}');
 log("PATCH duplicitní předání canvasu -> další pthread bez canvasu");
+const transferMarker='canvas.controlTransferredOffscreen=true';
+const transferOccurrences=js.split(transferMarker).length-1;
+log("CANVAS TRANSFER MARKER",transferOccurrences);
+if(transferOccurrences===1){
+ js=js.replace(transferMarker,'console.warn("BO1Z CANVAS TRANSFER ownership -> worker",name||canvas?.id||"unknown");'+transferMarker);
+ log("PATCH CANVAS OWNERSHIP TRACE enabled");
+}else log("CANVAS OWNERSHIP TRACE SKIPPED – unexpected generated glue code");
+
 const start="function __asyncjs__InitializeWebGPU(pipeline){",end='__asyncjs__InitializeWebGPU.sig="ii"';const a=js.indexOf(start),b=js.indexOf(end,a);
 if(a<0||b<0)throw Error("WebGPU init nenalezen");
 js=js.slice(0,a)+'function __asyncjs__InitializeWebGPU(pipeline){console.warn("BO1Z mobile forced WebGL2 fallback");return 0}'+js.slice(b);
@@ -277,7 +285,7 @@ const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
 if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.6.9",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.7.0",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
@@ -313,7 +321,7 @@ const config={
 canvas,noInitialRun:true,pthreadWorkerURL:modURL,wasmMemory:memory,
 print:t=>log("ENGINE",t),printErr:t=>log("ENGINE ERR",t),
 onAbort:t=>{log("ENGINE ABORT",t);showUI(true)},onExit:code=>{log("ENGINE EXIT",code);showUI(true)},
-onRuntimeInitialized:()=>log("RUNTIME INITIALIZED"),
+onRuntimeInitialized:()=>log("RUNTIME INITIALIZED","canvasTransferred",!!canvas.controlTransferredOffscreen),
 instantiateWasm(imports,done){try{const instance=new WebAssembly.Instance(compiled,imports);done(instance,compiled);log("WASM INSTANCE + REAL IMPORTS OK")}catch(err){log("WASM INIT ERROR",err.stack||err.message);throw err}}
 };
 stat("Inicializuju původní engine a pthread workery…");
@@ -337,6 +345,14 @@ try{
 }catch(e){log("BOOT OPFS CHECK FAILED",e.name,e.message)}
 const args=['+set','fs_b','/opfs/pack-kino','+set','fs_h','/opfs/user','+set','kisak_zombies','1','+set','zombiemode','1','+set','r_webgpu','0','+set','r_fullscreen','0','+set','r_smp_backend','0','+set','r_aaSamples','1','+set','r_clear','0','+set','r_customMode',canvas.width+'x'+canvas.height,'+devmap',$("map").value];
 persistLog();
+log("CANVAS BEFORE MAIN","transferControlToOffscreen",typeof canvas.transferControlToOffscreen,"controlTransferredOffscreen",!!canvas.controlTransferredOffscreen,"webgl2ContextProbe","skipped to avoid stealing GPU context");
+let heartbeat=0,previousTick=performance.now();
+const ticker=setInterval(()=>{
+ const now=performance.now(),lag=Math.round(now-previousTick-1000);previousTick=now;
+ if(lag>200)log("MAIN EVENT LOOP LAG",lag,"ms");
+ if(++heartbeat%5===0)log("MAIN EVENT LOOP ALIVE",heartbeat,"s","canvasTransferred",!!canvas.controlTransferredOffscreen);
+},1000);
+window.addEventListener("pagehide",()=>clearInterval(ticker),{once:true});
 log("RUN ORIGINAL MAIN",args.join(" "));
 stat("Spouštím originální main; panel nechávám otevřený kvůli dostupnosti logu.");
 log("BOOT UI SAFE MODE – panel remains visible throughout engine test");
