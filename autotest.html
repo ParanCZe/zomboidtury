@@ -493,7 +493,7 @@ function autoSummary(){
 
  const val=i=>d3dTraceMemory?Atomics.load(d3dTraceMemory,i):null;
  const fmt=v=>v===null?"Not instrumented":v===-1?"Not reached":(v+" (0x"+(v>>>0).toString(16)+")");
- const wasmTrace="\\n\\nWASM CREATEDEVICE TRACE\\nValidatePresentation: "+fmt(val(0))+"\\nConfigureBackBuffer: "+fmt(val(1));
+ const wasmTrace="\n\nWASM CREATEDEVICE TRACE\nValidatePresentation: "+fmt(val(0))+"\nConfigureBackBuffer: "+fmt(val(1));
  const important=[...auditLines,...graphicsLines].filter(x=>/BO1Z D3D NATIVE STATE|BO1Z CTX BRIDGE|BO1Z GL REAL CONTEXT|BO1Z GL CREATE|GRAPHICS GLUE SOURCE|GFX WORKER HOOK|BO1Z GFX WORKER|CreateDevice|Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed|BOOT ERROR|WASM INIT ERROR/i.test(x));
  autoReport="BO1Z AUTO TEST v1.5\n"+new Date().toISOString()+"\n\n"+rows.map(([name,ok,extra])=>(ok?"PASS ":"CHECK ")+name+" – "+extra).join("\n")+"\n\n"+(failed?"BLOKACE: CreateDevice selhal. Hra není spustitelná.":"Grafický start nebyl potvrzen; nepovažovat za úspěšný herní start.")+"\n\nRENDERER DIAGNOSTIKA\n"+wasmTrace+"\n"+important.slice(-70).join("\n");
  $("summary").textContent=autoReport;
