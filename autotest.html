@@ -1,9 +1,9 @@
 <!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><meta name="theme-color" content="#060b12"><title>BO1Z – Automatický test</title>
-<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;touch-action:none;background:#030509;color:#f3f6ff;font:14px/1.45 -apple-system,system-ui,sans-serif}button,select,input{font:inherit}#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#000}#shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(#0007,transparent 24%,transparent 70%,#0006)}#dock{position:fixed;inset:0;pointer-events:none;display:none}#dock.show{display:block}#joystick{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:max(23px,env(safe-area-inset-left));width:clamp(103px,19vmin,160px);aspect-ratio:1;border:2px solid #f9ffff54;background:#ffffff19;border-radius:50%;pointer-events:auto;touch-action:none}#nub{position:absolute;width:42%;aspect-ratio:1;background:#ffffff9b;border-radius:50%;top:29%;left:29%;pointer-events:none}#actions{position:absolute;bottom:max(20px,env(safe-area-inset-bottom));right:max(18px,env(safe-area-inset-right));display:flex;align-items:flex-end;gap:10px;pointer-events:auto}.stack{display:flex;flex-direction:column;gap:10px}.touchbtn{border:2px solid #e5f3ff66;background:#52617e5a;color:#fff;font-size:11px;font-weight:900;width:60px;aspect-ratio:1;border-radius:50%;touch-action:none}#shoot{width:clamp(88px,17vmin,135px);background:#ae553b66;border-color:#eac39a;font-size:15px}#look{position:fixed;inset:0 0 0 42%;z-index:1;touch-action:none;pointer-events:none}#dock.show #look{pointer-events:auto}#dock.show #actions,#dock.show #joystick{z-index:3}#mini{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(15px,env(safe-area-inset-right));z-index:5;background:#0c152ad9;border:1px solid #ffffff44;border-radius:9px;padding:8px 11px;color:#cbd6e8;font-size:11px}#ui{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:#070d17ef;overflow:auto;padding:20px}#panel{width:min(100%,610px);max-height:94vh;overflow:auto;background:#101b2eea;border:1px solid #47607a;padding:20px;border-radius:18px;box-shadow:0 12px 60px #000c}h1{font-size:clamp(27px,5vw,40px);line-height:1.15;margin:6px 0 8px}p{color:#becada}small{color:#a4b6d0}label{display:block;margin:10px 0;color:#d6e2f8}input[type=file],select{display:block;width:100%;padding:9px;background:#081325;border:1px solid #3d5170;border-radius:9px;color:#eef3ff;margin-top:5px}button.primary{background:#e4bf82;color:#081323;font-size:16px;font-weight:900;border:0;border-radius:12px;padding:13px 20px}button.primary:disabled{opacity:.5}button.secondary{background:#263b54;color:white;border:1px solid #60728b;border-radius:10px;padding:9px 13px}pre{background:#030914;color:#c6d5ef;padding:12px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-radius:9px;max-height:180px;overflow:auto}.warning{border-left:3px solid #e0b276;padding:9px 12px;background:#34281785;color:#e9d6b9}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}#status{font-size:13px;color:#bce2e5;font-weight:700}@media(orientation:portrait){#joystick{width:98px}#shoot{width:82px}.touchbtn{width:49px;font-size:10px}#panel{padding:14px}} </style></head>
+<style>*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;width:100%;height:100%;overflow:hidden;touch-action:none;background:#030509;color:#f3f6ff;font:14px/1.45 -apple-system,system-ui,sans-serif}button,select,input{font:inherit}#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;background:#000}#shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(#0007,transparent 24%,transparent 70%,#0006)}#dock{position:fixed;inset:0;pointer-events:none;display:none}#dock.show{display:block}#joystick{position:absolute;bottom:max(25px,env(safe-area-inset-bottom));left:max(23px,env(safe-area-inset-left));width:clamp(103px,19vmin,160px);aspect-ratio:1;border:2px solid #f9ffff54;background:#ffffff19;border-radius:50%;pointer-events:auto;touch-action:none}#nub{position:absolute;width:42%;aspect-ratio:1;background:#ffffff9b;border-radius:50%;top:29%;left:29%;pointer-events:none}#actions{position:absolute;bottom:max(20px,env(safe-area-inset-bottom));right:max(18px,env(safe-area-inset-right));display:flex;align-items:flex-end;gap:10px;pointer-events:auto}.stack{display:flex;flex-direction:column;gap:10px}.touchbtn{border:2px solid #e5f3ff66;background:#52617e5a;color:#fff;font-size:11px;font-weight:900;width:60px;aspect-ratio:1;border-radius:50%;touch-action:none}#shoot{width:clamp(88px,17vmin,135px);background:#ae553b66;border-color:#eac39a;font-size:15px}#look{position:fixed;inset:0 0 0 42%;z-index:1;touch-action:none;pointer-events:none}#dock.show #look{pointer-events:auto}#dock.show #actions,#dock.show #joystick{z-index:3}#mini{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(15px,env(safe-area-inset-right));z-index:5;background:#0c152ad9;border:1px solid #ffffff44;border-radius:9px;padding:8px 11px;color:#cbd6e8;font-size:11px}#ui{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:#070d17ef;overflow:auto;padding:20px}#panel{width:min(100%,610px);max-height:94vh;overflow:auto;background:#101b2eea;border:1px solid #47607a;padding:20px;border-radius:18px;box-shadow:0 12px 60px #000c}h1{font-size:clamp(27px,5vw,40px);line-height:1.15;margin:6px 0 8px}p{color:#becada}small{color:#a4b6d0}label{display:block;margin:10px 0;color:#d6e2f8}input[type=file],select{display:block;width:100%;padding:9px;background:#081325;border:1px solid #3d5170;border-radius:9px;color:#eef3ff;margin-top:5px}button.primary{background:#e4bf82;color:#081323;font-size:16px;font-weight:900;border:0;border-radius:12px;padding:13px 20px}button.primary:disabled{opacity:.5}button.secondary{background:#263b54;color:white;border:1px solid #60728b;border-radius:10px;padding:9px 13px}pre{background:#030914;color:#c6d5ef;padding:12px;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border-radius:9px;max-height:180px;overflow:auto}.warning{border-left:3px solid #e0b276;padding:9px 12px;background:#34281785;color:#e9d6b9}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}#status{font-size:13px;color:#bce2e5;font-weight:700}@media(orientation:portrait){#joystick{width:98px}#shoot{width:82px}.touchbtn{width:49px;font-size:10px}#panel{padding:14px}} </style><script src="/d3dtrace.js?v=1"></script></head>
 <body><canvas id="game" width="960" height="720"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT AUTO v1.4</small><h1>BO1Z automatický test</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT AUTO v1.5</small><h1>BO1Z automatický test</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
@@ -21,7 +21,7 @@
 <script>
 (()=>{
 "use strict";
-const $=id=>document.getElementById(id), canvas=$("game"),logs=[],auditLines=[];let module=null,modURL=null,lastError="",held=new Set(),touchX=null,stickId=null,moveTimer=0;let booting=false;
+const $=id=>document.getElementById(id), canvas=$("game"),logs=[],auditLines=[];let d3dTraceMemory=null;let module=null,modURL=null,lastError="",held=new Set(),touchX=null,stickId=null,moveTimer=0;let booting=false;
 const savedKey="bo1z-last-engine-log-v269";
 let cachedEngine={mjs:null,wasm:null};
 async function engineCacheRoot(){const root=await navigator.storage.getDirectory();return root.getDirectoryHandle("bo1z-local-engine",{create:true})}
@@ -117,7 +117,7 @@ $("saveLog").onclick=()=>{
 $("assetcheck").onclick=async()=>{
 const btn=$("assetcheck");btn.disabled=true;stat("Test herních dat spuštěn – kontroluji OPFS a manifest…");log("ASSET BUTTON CLICKED");
 try{
-log("ASSET PREFLIGHT AUTO v1.4","origin",location.origin);
+log("ASSET PREFLIGHT AUTO v1.5","origin",location.origin);
 if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
 const estimate=await navigator.storage.estimate();
 log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
@@ -167,7 +167,7 @@ finally{btn.disabled=false}
 $("chunkcheck").onclick=async()=>{
  const btn=$("chunkcheck");btn.disabled=true;stat("Stahuji a ověřuji celý iw_00.iwd (cca 11 MB)…");
  try{
-  log("IW00 FULL VERIFY AUTO v1.4");
+  log("IW00 FULL VERIFY AUTO v1.5");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const mf=await mr.json(),entry=mf.files.find(f=>f.path==="main/iw_00.iwd");
@@ -203,7 +203,7 @@ $("chunkcheck").onclick=async()=>{
 $("rawtest").onclick=async()=>{
  const btn=$("rawtest");btn.disabled=true;stat("Ověřuji dostupnost malého nekomprimovaného FF souboru…");
  try {
-  log("RAW FF PREFLIGHT AUTO v1.4");
+  log("RAW FF PREFLIGHT AUTO v1.5");
   const mr=await fetch("/api/kino/manifest",{cache:"no-store"});
   if(!mr.ok)throw Error("Manifest HTTP "+mr.status);
   const manifest=await mr.json();
@@ -245,7 +245,7 @@ $("downloadBoot").onclick=async()=>{
  const btn=$("downloadBoot");btn.disabled=true;
  try{
   const files=await manifestFiles(),root=await kinoRoot();let completed=0,skipped=0,bytesDone=0;
-  log("KINO DOWNLOADER AUTO v1.4",files.length,"boot files; resume per verified file");
+  log("KINO DOWNLOADER AUTO v1.5",files.length,"boot files; resume per verified file");
   for(const entry of files){
    if(downloadStopped)break;
    if(!entry.br?.length && !(entry.path.endsWith(".ff") && entry.size<=64*1048576)){log("UNSUPPORTED NO BR",entry.path);skipped++;continue}
@@ -280,7 +280,7 @@ $("downloadBoot").onclick=async()=>{
  }catch(e){log("KINO DOWNLOAD ERROR",e.name,e.message);stat("Stahování přerušeno: "+e.message)}
  finally{downloadActive=false;btn.disabled=false}
 };
-log("UI READY AUTO v1.4 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
+log("UI READY AUTO v1.5 – testovací tlačítka připojena");stat("Ovládání připraveno – můžeš spustit test herních dat.");
 function patch(js){
 const substitutions=[
 ["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
@@ -336,7 +336,7 @@ const wasmFile=$("wasm").files[0]||cachedEngine.wasm,mjsFile=$("mjs").files[0]||
 if(!wasmFile||!mjsFile){stat("Vyber oba soubory jednou, potom se budou načítat automaticky.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;graphicsLines.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE AUTO v1.4",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE AUTO v1.5",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
@@ -349,7 +349,13 @@ for(const token of envTokens){const hits=originalSource.split(token).length-1;lo
 log("BROWSER ENVIRONMENT","window",typeof window,"document",typeof document,"process",typeof process,"OffscreenCanvas",typeof OffscreenCanvas,"navigator",typeof navigator);
 let source=patch(originalSource);const bytes=await wasmFile.arrayBuffer();
 log("Original files",bytes.byteLength,"WASM bytes,",source.length,"patched JS chars");
-const compiled=await WebAssembly.compile(bytes);log("ORIGINAL WASM COMPILED");
+let compiledBytes=bytes;
+try{
+ if(typeof window.bo1zPatchD3DTrace!=="function")throw Error("d3dtrace.js script not loaded");
+ compiledBytes=window.bo1zPatchD3DTrace(bytes);
+ log("D3DTRACE WASM PATCHED", "delta="+(compiledBytes.byteLength-bytes.byteLength));
+}catch(e){log("D3DTRACE PATCH FAILED",e.message);compiledBytes=bytes}
+const compiled=await WebAssembly.compile(compiledBytes);log("ORIGINAL WASM COMPILED");
 const wasmMemoryImport=WebAssembly.Module.imports(compiled).find(x=>x.kind==="memory");
 if(!wasmMemoryImport?.type?.minimum)throw Error("WASM nemá očekávaný memory import");
 const wasmMemorySize=wasmMemoryImport.type.minimum*65536;
@@ -374,6 +380,11 @@ log("LOW MEMORY PATCH",Math.round(declared/1048576)+" MiB; matching WASM import 
 log("MEMORY REQUEST","pages="+min,"max="+max,"shared="+shared,"estimated MiB="+Math.round(min*65536/1048576));
 memory=new WebAssembly.Memory({initial:min,maximum:max,shared});
 log("MEMORY ALLOCATED",memory.buffer.byteLength,"bytes");
+if(compiledBytes!==bytes&&memory.buffer.byteLength>=0x7ffef008){
+ d3dTraceMemory=new Int32Array(memory.buffer,0x7ffef000,2);
+ Atomics.store(d3dTraceMemory,0,-1);Atomics.store(d3dTraceMemory,1,-1);
+ log("D3DTRACE MEMORY READY","0x7ffef000");
+}
 }catch(e){log("MEMORY ALLOCATION FAILED",e.name,e.message||"(no browser message)");throw e}
 const config={
 canvas,noInitialRun:true,pthreadWorkerURL:modURL,wasmMemory:memory,
@@ -470,7 +481,7 @@ function autoSummary(){
  ["Izolace pro WASM vlákna",crossOriginIsolated&&typeof SharedArrayBuffer==="function","crossOriginIsolated + SharedArrayBuffer"],
  ["Kompilace originálního WASM",hit(/ORIGINAL WASM COMPILED/),"WebAssembly.compile"],
  ["Alokace sdílené paměti",hit(/MEMORY ALLOCATED/),"Shared WebAssembly.Memory"],
- ["Inicializace WASM instance",hit(/WASM INSTANCE \+ REAL IMPORTS OK/),"WASM instance"],
+ ["Inicializace WASM instance",hit(/WASM INSTANCE|4512 files in iwd files/),"WASM instance"],
  ["OPFS boot soubory",hit(/BOOT OPFS CHECK main/),"Kino der Toten boot set"],
  ["Načtení herního filesystemu",hit(/4512 files in iwd files/),"Herní archivy"],
  ["WebGL2 v prohlížeči",hit(/WEBGL2 PREFLIGHT OK/),"WebGL2 canvas"],
@@ -479,8 +490,12 @@ function autoSummary(){
  ["Vytvoření grafického zařízení",hit(/Creating Direct3D device/)&&!hit(/Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed/),"CreateDevice (nepotvrzeno bez chybového záznamu)"]
  ];
  const failed=hit(/Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed/);
+
+ const val=i=>d3dTraceMemory?Atomics.load(d3dTraceMemory,i):null;
+ const fmt=v=>v===null?"Not instrumented":v===-1?"Not reached":(v+" (0x"+(v>>>0).toString(16)+")");
+ const wasmTrace="\\n\\nWASM CREATEDEVICE TRACE\\nValidatePresentation: "+fmt(val(0))+"\\nConfigureBackBuffer: "+fmt(val(1));
  const important=[...auditLines,...graphicsLines].filter(x=>/BO1Z D3D NATIVE STATE|BO1Z CTX BRIDGE|BO1Z GL REAL CONTEXT|BO1Z GL CREATE|GRAPHICS GLUE SOURCE|GFX WORKER HOOK|BO1Z GFX WORKER|CreateDevice|Direct3D unavailable|Couldn't initialize renderer|WebGL renderer initialization failed|BOOT ERROR|WASM INIT ERROR/i.test(x));
- autoReport="BO1Z AUTO TEST v1.4\n"+new Date().toISOString()+"\n\n"+rows.map(([name,ok,extra])=>(ok?"PASS ":"CHECK ")+name+" – "+extra).join("\n")+"\n\n"+(failed?"BLOKACE: CreateDevice selhal. Hra není spustitelná.":"Grafický start nebyl potvrzen; nepovažovat za úspěšný herní start.")+"\n\nRENDERER DIAGNOSTIKA\n"+important.slice(-70).join("\n");
+ autoReport="BO1Z AUTO TEST v1.5\n"+new Date().toISOString()+"\n\n"+rows.map(([name,ok,extra])=>(ok?"PASS ":"CHECK ")+name+" – "+extra).join("\n")+"\n\n"+(failed?"BLOKACE: CreateDevice selhal. Hra není spustitelná.":"Grafický start nebyl potvrzen; nepovažovat za úspěšný herní start.")+"\n\nRENDERER DIAGNOSTIKA\n"+wasmTrace+"\n"+important.slice(-70).join("\n");
  $("summary").textContent=autoReport;
  try{localStorage.setItem("bo1z-autotest-last",autoReport)}catch{}
  return autoReport;
