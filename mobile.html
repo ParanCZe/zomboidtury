@@ -3,7 +3,7 @@
 <body><canvas id="game" width="960" height="540"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.5.6</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.5.7</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
@@ -42,7 +42,7 @@ $("mini").onclick=()=>showUI(true);$("show").onclick=()=>showUI(false);$("copy")
 $("assetcheck").onclick=async()=>{
 const btn=$("assetcheck");btn.disabled=true;
 try{
-log("ASSET PREFLIGHT v2.5.6","origin",location.origin);
+log("ASSET PREFLIGHT v2.5.7","origin",location.origin);
 if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
 const estimate=await navigator.storage.estimate();
 log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
@@ -97,7 +97,7 @@ const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
 if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5.6",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5.7",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
