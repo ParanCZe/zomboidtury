@@ -6,7 +6,7 @@
     Module.setStatus('Načítání enginu…');
     const parts = [];
     for (const name of ["blackops.wasm.001", "blackops.wasm.002", "blackops.wasm.003"]) {
-      const response = await fetch(new URL(name, document.baseURI));
+      const response = await fetch(new URL(name, document.baseURI), {cache: "no-store"});
       if (!response.ok) throw new Error(name + ': HTTP ' + response.status);
       parts.push(new Uint8Array(await response.arrayBuffer()));
     }
@@ -21,7 +21,7 @@
       window.__kbRuntimeReject = reject;
     });
     const script = document.createElement('script');
-    script.src = new URL('blackops.js', document.baseURI).href;
+    script.src = new URL('blackops.js?v=dxt-fallback-1', document.baseURI).href;
     script.onerror = () => window.__kbRuntimeReject(new Error('Nepodařilo se načíst blackops.js.'));
     document.body.append(script);
     await ready;
