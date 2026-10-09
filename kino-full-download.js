@@ -10,7 +10,15 @@ async function shaFile(file){const h=new window.bo1zSHA256(),r=file.stream().get
 function record(e,f){try{localStorage.setItem(memKey(e),JSON.stringify({sha:e.sha256,size:e.size,time:f.lastModified}))}catch{}}
 function resetRecord(e){try{localStorage.removeItem(memKey(e))}catch{}}
 async function existsVerified(h,e){
-const f=await h.getFile();if(f.size!==e.size)return false;
+const f=await h.getFile();
+try{
+ const override=JSON.parse(localStorage.getItem("bo1z-user-archive:"+e.path)||"null");
+ if(override?.zipValidated===true &&
+  override.size===f.size && override.lastModified===f.lastModified &&
+  /^[0-9a-f]{64}$/i.test(override.sha256))
+  return true;
+}catch{}
+if(f.size!==e.size)return false;
 let memo=null;try{memo=JSON.parse(localStorage.getItem(memKey(e))||"null")}catch{}
 if(memo&&memo.sha===e.sha256&&memo.size===e.size&&memo.time===f.lastModified)return true;
 const actual=await shaFile(f);if(actual.toLowerCase()!==e.sha256.toLowerCase()){resetRecord(e);return false}record(e,f);return true;
