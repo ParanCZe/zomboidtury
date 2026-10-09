@@ -29,6 +29,7 @@
 <script>
 (()=>{
 "use strict";
+const inAppBoot=new URLSearchParams(location.search).get("autoboot")==="1";
 const $=id=>document.getElementById(id), canvas=$("game"),logs=[];let module=null,modURL=null,lastError="",held=new Set(),touchX=null,stickId=null,moveTimer=0;let booting=false;
 const savedKey="bo1z-last-engine-log-v269";
 let cachedEngine={mjs:null,wasm:null};
@@ -496,15 +497,15 @@ const ticker=setInterval(()=>{
 window.addEventListener("pagehide",()=>clearInterval(ticker),{once:true});
 log("RUN ORIGINAL MAIN",args.join(" "));
 stat("Spouštím originální main; panel nechávám otevřený kvůli dostupnosti logu.");
-log("BOOT UI SAFE MODE – panel remains visible throughout engine test");
-showUI(true);
+log("BOOT UI",inAppBoot?"hide diagnostic panel for PWA play mode":"diagnostic panel visible");
+showUI(!inAppBoot);
 await new Promise(resolve=>setTimeout(resolve,80));
-try{const code=await module.callMain(args);log("ORIGINAL MAIN RETURN",String(code));stat("Main skončil: "+String(code)+" – log zůstává dostupný");showUI(true)}
+try{const code=await module.callMain(args);log("ORIGINAL MAIN RETURN",String(code));stat("Engine main bootstrap: "+String(code));showUI(!inAppBoot)}
 catch(err){log("MAIN ERROR",err.stack||err.message);stat("Herní main skončil chybou – viz protokol.");showUI(true)}
 }catch(err){log("BOOT ERROR",err.name||"",err.message||"(no browser message)",err.stack||"");stat("Start selhal – pošli protokol.");showUI(true)}
 finally{clearTimeout(timeout);booting=false;$("boot").disabled=false}
 };
-if(new URLSearchParams(location.search).get("autoboot")==="1"){
+if(inAppBoot){
   setTimeout(async()=>{try{await loadEngineCache();if(!booting)$("boot").click()}catch(error){stat("Automatický start selhal: "+error.message)}},650);
 }
 })();
