@@ -30,6 +30,25 @@ export default {
         });
       }
     }
+    if (url.pathname === "/api/kino/sample") {
+      try {
+        const upstreamUrl = "https://cdn.vel.gg/packs/kino/localization.txt.br/0?v=a102dfb5515f8fb1";
+        const upstream = await fetch(upstreamUrl, {redirect:"manual", headers:{"Accept":"*/*"}});
+        if (!upstream.ok) return new Response("CDN upstream HTTP " + upstream.status, { status:502 });
+        const bytes = await upstream.arrayBuffer();
+        if (bytes.byteLength > 16384) return new Response("Sample unexpectedly large", {status:502});
+        return new Response(bytes, {headers:{
+          "Content-Type":"application/octet-stream",
+          "Cache-Control":"public, max-age=300",
+          "Cross-Origin-Resource-Policy":"same-origin",
+          "Cross-Origin-Opener-Policy":"same-origin",
+          "Cross-Origin-Embedder-Policy":"require-corp",
+          "X-Content-Type-Options":"nosniff"
+        }});
+      } catch(e) {
+        return new Response("CDN sample proxy failed: "+(e?.message||"unknown"),{status:502});
+      }
+    }
     // Restrict repository and deployment internals even if an ignore rule is misconfigured.
     if (/(^|\/)\.(?:git|wrangler|env)(?:\/|$)/i.test(url.pathname) ||
         /(?:^|\/)(?:wrangler\.jsonc?|package(?:-lock)?\.json|worker\.js|\.assetsignore)(?:$|\/)/i.test(url.pathname)) {
