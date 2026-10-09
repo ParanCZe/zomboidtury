@@ -49,15 +49,26 @@ export default {
         return new Response("CDN sample proxy failed: "+(e?.message||"unknown"),{status:502});
       }
     }
-    if (url.pathname === "/api/kino/iw00/chunk0") {
+    const chunkMatch = /^\/api\/kino\/iw00\/chunk([01])$/.exec(url.pathname);
+    if (chunkMatch) {
       try {
-        const u = "https://cdn.vel.gg/packs/kino/main/iw_00.iwd.br/0?v=b32bfd1562828385";
+        const part = Number(chunkMatch[1]);
+        const u = "https://cdn.vel.gg/packs/kino/main/iw_00.iwd.br/" + part + "?v=b32bfd1562828385";
         const r = await fetch(u, { redirect: "manual" });
-        if (!r.ok) return new Response("CDN HTTP " + r.status,{status:502});
+        if (!r.ok) return new Response("CDN HTTP " + r.status, { status: 502 });
         const body = await r.arrayBuffer();
-        if (body.byteLength > 9437184) return new Response("Chunk too large",{status:502});
-        return new Response(body,{headers:{"Content-Type":"application/octet-stream","Cache-Control":"public, max-age=300","Cross-Origin-Resource-Policy":"same-origin","Cross-Origin-Opener-Policy":"same-origin","Cross-Origin-Embedder-Policy":"require-corp","X-Content-Type-Options":"nosniff"}});
-      } catch(e) {return new Response("Chunk proxy failed: "+(e?.message||"unknown"),{status:502});}
+        if (body.byteLength > 9437184) return new Response("Chunk too large", { status: 502 });
+        return new Response(body, { headers: {
+          "Content-Type": "application/octet-stream",
+          "Cache-Control": "public, max-age=300",
+          "Cross-Origin-Resource-Policy": "same-origin",
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Cross-Origin-Embedder-Policy": "require-corp",
+          "X-Content-Type-Options": "nosniff"
+        } });
+      } catch (e) {
+        return new Response("Chunk proxy failed: " + (e?.message || "unknown"), { status: 502 });
+      }
     }
     // Restrict repository and deployment internals even if an ignore rule is misconfigured.
     if (/(^|\/)\.(?:git|wrangler|env)(?:\/|$)/i.test(url.pathname) ||
