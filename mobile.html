@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#090d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ZOMBIES MOBILE · Playable Alpha</title>
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif;color:white}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;touch-action:none;background:#050809;user-select:none;-webkit-user-select:none;overscroll-behavior:none}
+#screen{position:absolute;width:100%;height:100%;display:block;image-rendering:auto;touch-action:none}
+#vignette{pointer-events:none;position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 40%,#000a 100%)}
+#hurt{position:absolute;inset:0;pointer-events:none;background:#c11;opacity:0}
+#hud{position:absolute;top:max(12px,env(safe-area-inset-top));left:max(15px,env(safe-area-inset-left));right:max(15px,env(safe-area-inset-right));display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none;gap:15px;font-weight:900;text-shadow:0 2px 8px black}
+#hud .small{color:#bbc8c7;font-size:11px;letter-spacing:2px}#hud .large{font-size:clamp(16px,3.7vw,26px)}
+#hud .ammo{text-align:right;font-variant-numeric:tabular-nums}#hud .ammo .large{color:#f8df9f}
+#hud .red{color:#f88}
+#crosshair{position:absolute;top:50%;left:50%;width:16px;height:16px;pointer-events:none;transform:translate(-50%,-50%);opacity:.9}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#e6f4dd;border-radius:3px}
+#crosshair:before{width:2px;height:16px;left:7px}#crosshair:after{width:16px;height:2px;top:7px}
+#bottom{position:absolute;bottom:max(15px,env(safe-area-inset-bottom));left:max(20px,env(safe-area-inset-left));right:max(20px,env(safe-area-inset-right));display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
+#stick{width:clamp(106px,19vmin,156px);height:clamp(106px,19vmin,156px);border:2px solid #b2c8ca55;border-radius:50%;background:#ffffff15;position:relative;pointer-events:auto;touch-action:none}
+#nub{position:absolute;width:43%;height:43%;left:28.5%;top:28.5%;border-radius:50%;background:#c2d1d28f;box-shadow:0 0 19px #0008}
+#buttons{display:flex;align-items:flex-end;gap:15px;pointer-events:auto}
+#rightcol{display:flex;flex-direction:column;gap:12px}
+.control{border:2px solid #fff8;background:#ffffff20;color:white;border-radius:50%;font-size:12px;font-weight:900;letter-spacing:1px;display:flex;justify-content:center;align-items:center;touch-action:none;box-shadow:0 4px 16px #000b}
+#fire{width:clamp(88px,16vmin,130px);height:clamp(88px,16vmin,130px);border-color:#ffdeaa;background:#d26c342b;font-size:15px}
+#reload,#sprint{width:60px;height:60px}
+#pause{position:absolute;top:max(63px,calc(env(safe-area-inset-top) + 52px));right:max(18px,env(safe-area-inset-right));padding:8px 13px;background:#111a21b8;border:1px solid #ffffff50;border-radius:10px;color:#fff;font-weight:800;z-index:6}
+#toast{position:absolute;top:24%;left:50%;transform:translateX(-50%);text-align:center;font-weight:900;font-size:clamp(22px,5vw,40px);color:#ffdc9b;text-shadow:0 4px 12px black;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap}
+#overlay{position:absolute;inset:0;z-index:10;background:linear-gradient(140deg,#0a1013ed,#161d27ee);display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+#panel{max-width:530px;text-align:center}#panel .eyebrow{color:#eabd85;font-weight:900;letter-spacing:4px;font-size:12px}h1{font-size:clamp(34px,9vw,72px);line-height:1;margin:16px 0 12px;letter-spacing:-3px}p{line-height:1.55;color:#b8c2ca;font-size:14px}#start{color:#0d1314;background:#e6bd82;border:0;border-radius:13px;padding:14px 28px;font-size:17px;font-weight:900;margin-top:10px}
+#mode{font-size:11px;color:#e6bfa8;margin-top:15px}
+kbd{border:1px solid #777a;padding:2px 5px;border-radius:4px}
+@media (pointer:fine){#bottom{opacity:.75}}@media(orientation:portrait){#stick{width:95px;height:95px}#fire{width:77px;height:77px}#reload,#sprint{width:46px;height:46px;font-size:9px}#buttons{gap:5px}#rightcol{gap:7px}}
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas><div id="vignette"></div><div id="hurt"></div>
+<div id="hud"><div><div class="small">ZOMBIES · MOBILNÍ ALPHA</div><div id="round" class="large">VLNA 1</div><div id="hp" class="large red">♥ 100</div></div><div class="ammo"><div id="points" class="small">0 BODŮ</div><div id="bullets" class="large">12 / 96</div><div class="small">PISTOLE · 9 MM</div></div></div>
+<div id="crosshair"></div><div id="toast"></div><div id="bottom"><div id="stick"><div id="nub"></div></div><div id="buttons"><div id="rightcol"><div class="control" id="reload">NABÍT</div><div class="control" id="sprint">BĚH</div></div><div id="fire" class="control">STŘELBA</div></div></div>
+<button id="pause" type="button">Ⅱ</button>
+<div id="overlay"><div id="panel"><div class="eyebrow">IPAD · IPHONE · PC</div><h1>ZOMBIES<br>MOBILE</h1><p>První <b>hratelný</b> mobilní prototyp. Pohybuj se levým joystickem, míř tažením po pravé části obrazovky, střílej a přežij co nejvíc vln.</p><p>Na počítači: <kbd>WASD</kbd> pohyb, myš pro míření, kliknutí pro střelbu, <kbd>R</kbd> přebití. Na mobilu doporučujeme režim na šířku.</p><button id="start">HRÁT</button><p id="mode">Samostatný prototyp s vlastní grafikou. NENÍ to originální BO1Z ani port původních map.</p></div></div>
+<script>
+(()=>{
+"use strict";
+const canvas=document.getElementById("screen"),ctx=canvas.getContext("2d",{alpha:false});
+const off=document.createElement("canvas"),g=off.getContext("2d",{alpha:false});
+const W=480,H=270;off.width=W;off.height=H;
+const $=id=>document.getElementById(id);
+let on=false,dead=false,paused=true,last=0,now=0,frame=0;
+let wave=0,zombies=[],kills=0,score=0,hp=100,ammo=12,reserve=96,reloadLeft=0,shotLeft=0,shake=0,hurtLevel=0,nextWave=0,messageLeft=0;
+const MAP=[
+"####################",
+"#......#...........#",
+"#......#...........#",
+"#......#...........#",
+"#......#.....##....#",
+"#......#...........#",
+"#..................#",
+"####..#####........#",
+"#..................#",
+"#...##.............#",
+"#...##....####.....#",
+"#..................#",
+"#..................#",
+"#............##....#",
+"#............##....#",
+"#..................#",
+"#......###.........#",
+"#..................#",
+"#..................#",
+"####################"
+];
+const p={x:3.4,y:3.3,a:0.42};
+const keys=new Set(),touch={dx:0,dy:0,fire:false,sprint:false,lookId:null,lookX:0};
+const FOV=Math.PI/2.95, zbuf=new Float32Array(W/2);
+const wall=(x,y)=>!MAP[Math.floor(y)]||MAP[Math.floor(y)][Math.floor(x)]==="#"||!MAP[Math.floor(y)][Math.floor(x)];
+const free=(x,y,r=.21)=>!wall(x-r,y-r)&&!wall(x+r,y-r)&&!wall(x-r,y+r)&&!wall(x+r,y+r);
+function move(ent,x,y,r=.2){if(free(ent.x+x,ent.y,r))ent.x+=x;if(free(ent.x,ent.y+y,r))ent.y+=y}
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const norm=a=>Math.atan2(Math.sin(a),Math.cos(a));
+function cast(x,y,dx,dy,max=24){
+ let mx=Math.floor(x),my=Math.floor(y),ddx=Math.abs(1/(dx||1e-9)),ddy=Math.abs(1/(dy||1e-9));
+ const stepx=dx<0?-1:1,stepy=dy<0?-1:1;
+ let sx=(dx<0?x-mx:mx+1-x)*ddx,sy=(dy<0?y-my:my+1-y)*ddy,side=0;
+ for(let i=0;i<64;i++){if(sx<sy){mx+=stepx;sx+=ddx;side=0}else{my+=stepy;sy+=ddy;side=1}const dist=side===0?sx-ddx:sy-ddy;if(wall(mx,my)||dist>max)return{dist:Math.min(dist,max),side,mx,my,hit:wall(mx,my)}}return{dist:max,side:0,mx,my,hit:false};
+}
+function toast(txt){$("toast").textContent=txt;$("toast").style.opacity=1;messageLeft=1.7}
+function waveStart(){wave++;const count=Math.min(5+wave*3,25);for(let i=0;i<count;i++)spawn();$("round").textContent="VLNA "+wave;toast("VLNA "+wave)}
+function spawn(){const cells=[];for(let y=1;y<MAP.length-1;y++)for(let x=1;x<MAP[y].length-1;x++)if(MAP[y][x]==="."&&Math.hypot(x+.5-p.x,y+.5-p.y)>5)cells.push([x+.5,y+.5]);if(!cells.length)return;const [x,y]=cells[Math.floor(Math.random()*cells.length)];zombies.push({x,y,hp:1+Math.floor(wave/3),speed:.5+Math.random()*.19+Math.min(wave*.025,.27),hit:0,attack:Math.random()*.8})}
+function reset(){p.x=3.4;p.y=3.3;p.a=.42;zombies=[];wave=0;kills=0;score=0;hp=100;ammo=12;reserve=96;reloadLeft=0;shotLeft=0;shake=0;nextWave=0;dead=false;on=true;paused=false;$("overlay").style.display="none";waveStart();last=performance.now();requestAnimationFrame(loop)}
+function end(){dead=true;paused=true;on=false;$("panel").innerHTML='<div class="eyebrow">KONEC HRY</div><h1>PŘEŽIL JSI<br>'+wave+' VLNY</h1><p>Zabití zombíci: <b>'+kills+'</b> · Body: <b>'+score+'</b></p><button id="again">HRÁT ZNOVU</button><p id="mode">Experimentální nezávislý mobilní prototyp.</p>';$("overlay").style.display="flex";$("again").onclick=reset}
+function reload(){if(reloadLeft>0||ammo===12||reserve===0||!on||paused)return;reloadLeft=1.35;toast("PŘEBÍJENÍ")}
+function fire(){if(shotLeft>0||reloadLeft>0||!on||paused)return;if(ammo===0){reload();return}ammo--;shotLeft=.22;shake=.075;let hit=null,nearest=1e9;
+for(const z of zombies){const dx=z.x-p.x,dy=z.y-p.y,d=Math.hypot(dx,dy),a=norm(Math.atan2(dy,dx)-p.a);if(Math.abs(a)>Math.atan(.31/d)+.035)continue;const ray=cast(p.x,p.y,dx/d,dy/d,d+.5);if(ray.hit&&ray.dist<d-.34)continue;if(d<nearest){nearest=d;hit=z}}
+if(hit){hit.hp--;hit.hit=.22;if(hit.hp<=0){zombies.splice(zombies.indexOf(hit),1);score+=100;kills++;if(kills%6===0)reserve+=12}}
+}
+function update(dt){
+now+=dt;frame++;shotLeft=Math.max(0,shotLeft-dt);shake=Math.max(0,shake-dt);hurtLevel=Math.max(0,hurtLevel-dt*1.4);
+if(reloadLeft>0){reloadLeft-=dt;if(reloadLeft<=0){const n=Math.min(12-ammo,reserve);ammo+=n;reserve-=n;reloadLeft=0}}
+if(touch.fire||keys.has(" "))fire();
+if(keys.has("r"))reload();
+let forward=-touch.dy+(keys.has("w")||keys.has("arrowup")?1:0)-(keys.has("s")||keys.has("arrowdown")?1:0);
+let strafe=touch.dx+(keys.has("d")?1:0)-(keys.has("a")?1:0);
+const len=Math.hypot(forward,strafe);if(len>1){forward/=len;strafe/=len}
+const speed=(touch.sprint||keys.has("shift")?3.75:2.6)*dt;
+move(p,(Math.cos(p.a)*forward-Math.sin(p.a)*strafe)*speed,(Math.sin(p.a)*forward+Math.cos(p.a)*strafe)*speed,.23);
+if(keys.has("arrowleft"))p.a-=dt*1.7;if(keys.has("arrowright"))p.a+=dt*1.7;
+for(const z of zombies){
+z.hit=Math.max(0,z.hit-dt);z.attack-=dt;const d=Math.hypot(p.x-z.x,p.y-z.y);
+if(d>.69){const factor=z.speed*dt/Math.max(.001,d);move(z,(p.x-z.x)*factor,(p.y-z.y)*factor,.19)}
+else if(z.attack<=0){z.attack=1.25;hp=Math.max(0,hp-13);hurtLevel=.85;shake=.14;if(hp<=0){end();return}}
+}
+if(!zombies.length){if(!nextWave)nextWave=now+2.2;if(now>=nextWave){nextWave=0;waveStart()}}else nextWave=0;
+$("hp").textContent="♥ "+Math.ceil(hp);$("bullets").textContent=(reloadLeft>0?"...":ammo)+" / "+reserve;$("points").textContent=score+" BODŮ";$("hurt").style.opacity=hurtLevel*.22;
+if(messageLeft>0){messageLeft-=dt;if(messageLeft<=0)$("toast").style.opacity=0}
+}
+function draw(){
+g.fillStyle="#1a2530";g.fillRect(0,0,W,H/2);g.fillStyle="#33322b";g.fillRect(0,H/2,W,H/2);
+g.fillStyle="#202b35";for(let i=H*.15;i<H/2;i+=H/13){g.fillRect(0,i,W,1)}
+for(let y=H/2;y<H;y+=Math.max(1,Math.floor((y-H/2)/20)+2)){g.fillStyle=(Math.floor(y/7)%2?"#39372e":"#302f2b");g.fillRect(0,y,W,1)}
+let sx=shake?Math.sin(now*80)*shake*9:0;
+for(let x=0;x<W;x+=2){
+const c=2*((x+1)/W)-1,ang=p.a+Math.atan(c*Math.tan(FOV/2)),dx=Math.cos(ang),dy=Math.sin(ang),r=cast(p.x,p.y,dx,dy);
+const d=Math.max(.07,r.dist*Math.cos(ang-p.a));zbuf[x/2]=d;
+const tall=Math.min(H*2,H*.96/d),top=Math.floor(H/2-tall/2+sx);
+const shade=clamp(1-d/20,.18,1)*(r.side?.78:1);
+const edge=(((r.mx*7+r.my*5)%4)===0)? .82:1;const v=shade*edge;
+g.fillStyle="rgb("+Math.round(103*v)+","+Math.round(113*v)+","+Math.round(104*v)+")";
+g.fillRect(x,top,2,tall);
+g.fillStyle="rgba(10,8,7,.23)";g.fillRect(x,top,2,Math.max(1,tall*.035));g.fillRect(x,top+tall*.78,2,Math.max(1,tall*.018));
+if(tall>10&&Math.floor((r.mx+r.my)*1.2)%3===0){g.fillStyle="rgba(12,14,12,.17)";g.fillRect(x,top+tall*.37,2,2)}
+}
+const visible=zombies.map(z=>({z,d:Math.hypot(z.x-p.x,z.y-p.y)})).sort((a,b)=>b.d-a.d);
+for(const {z,d} of visible){
+const a=norm(Math.atan2(z.y-p.y,z.x-p.x)-p.a);if(Math.abs(a)>FOV*.65)continue;
+const dep=d*Math.cos(a);if(dep<=.1)continue;
+const cx=W/2+(Math.tan(a)/Math.tan(FOV/2))*W/2;
+const h=H*.83/dep,w=h*.42;if(h<1||cx<-w||cx>W+w)continue;
+let zidx=clamp(Math.floor(cx/2),0,zbuf.length-1);if(zbuf[zidx]<dep-.35)continue;
+const cy=H/2+h*.15+sx;const yy=cy-h*.75;
+g.save();g.translate(cx,yy);g.globalAlpha=clamp(1-d/30,.36,1);
+g.fillStyle="#060b0a70";g.beginPath();g.ellipse(0,h*.78,w*.7,h*.08,0,0,Math.PI*2);g.fill();
+g.fillStyle=z.hit>0?"#d94b3a":"#47574a";
+g.beginPath();g.moveTo(-w*.29,h*.31);g.lineTo(w*.25,h*.31);g.lineTo(w*.33,h*.64);g.lineTo(-w*.33,h*.64);g.closePath();g.fill();
+g.strokeStyle=z.hit>0?"#f57b60":"#39423a";g.lineWidth=Math.max(1,w*.16);
+g.beginPath();g.moveTo(-w*.2,h*.42);g.lineTo(-w*.48,h*.66);g.moveTo(w*.22,h*.4);g.lineTo(w*.48,h*.64);g.moveTo(-w*.15,h*.63);g.lineTo(-w*.26,h*.82);g.moveTo(w*.14,h*.63);g.lineTo(w*.29,h*.83);g.stroke();
+g.fillStyle=z.hit>0?"#f1a08a":"#868f75";g.beginPath();g.ellipse(0,h*.23,w*.19,h*.15,0,0,Math.PI*2);g.fill();
+g.fillStyle="#e6b47b";g.fillRect(-w*.11,h*.205,w*.065,Math.max(1,h*.017));g.fillRect(w*.055,h*.205,w*.065,Math.max(1,h*.017));
+g.restore();
+}
+if(shotLeft>.14){g.fillStyle="#ffde993e";g.beginPath();g.arc(W*.51,H*.85,10+Math.random()*8,0,Math.PI*2);g.fill()}
+g.fillStyle="#181a1e";g.beginPath();g.moveTo(W*.41,H);g.lineTo(W*.44,H*.79);g.lineTo(W*.49,H*.75);g.lineTo(W*.55,H*.79);g.lineTo(W*.59,H);g.fill();g.fillStyle="#4f5150";g.fillRect(W*.49,H*.77,W*.02,H*.16);
+const cw=canvas.width,ch=canvas.height;ctx.clearRect(0,0,cw,ch);ctx.imageSmoothingEnabled=false;ctx.drawImage(off,0,0,cw,ch);
+}
+function loop(t){if(!on||paused)return;let dt=Math.min(.045,(t-last)/1000||.016);last=t;update(dt);if(!on)return;draw();requestAnimationFrame(loop)}
+function resize(){canvas.width=Math.max(320,Math.floor(innerWidth*devicePixelRatio*.72));canvas.height=Math.max(180,Math.floor(innerHeight*devicePixelRatio*.72))}
+addEventListener("resize",resize);resize();
+$("start").onclick=reset;
+$("pause").onclick=()=>{if(!on||dead)return;paused=!paused;if(paused){$("panel").innerHTML='<div class="eyebrow">PAUZA</div><h1>ZOMBIES MOBILE</h1><p>Pokračuj v přežívání.</p><button id="resume">POKRAČOVAT</button><p id="mode">Nezávislý mobilní prototyp.</p>';$("overlay").style.display="flex";$("resume").onclick=()=>{paused=false;$("overlay").style.display="none";last=performance.now();requestAnimationFrame(loop)}}else{$("overlay").style.display="none";last=performance.now();requestAnimationFrame(loop)}};
+$("reload").addEventListener("pointerdown",e=>{e.preventDefault();reload()});
+$("fire").addEventListener("pointerdown",e=>{e.preventDefault();touch.fire=true;e.currentTarget.setPointerCapture(e.pointerId);fire()});
+$("fire").addEventListener("pointerup",()=>touch.fire=false);$("fire").addEventListener("pointercancel",()=>touch.fire=false);
+$("sprint").addEventListener("pointerdown",e=>{e.preventDefault();touch.sprint=true;e.currentTarget.setPointerCapture(e.pointerId)});
+$("sprint").addEventListener("pointerup",()=>touch.sprint=false);$("sprint").addEventListener("pointercancel",()=>touch.sprint=false);
+const stick=$("stick"),nub=$("nub");let stickId=null;
+function stickPos(e){const b=stick.getBoundingClientRect(),mx=b.left+b.width/2,my=b.top+b.height/2,rad=b.width*.36;let x=clamp((e.clientX-mx)/rad,-1,1),y=clamp((e.clientY-my)/rad,-1,1);const l=Math.hypot(x,y);if(l>1){x/=l;y/=l}touch.dx=x;touch.dy=y;nub.style.transform="translate("+(x*rad)+"px,"+(y*rad)+"px)"}
+stick.addEventListener("pointerdown",e=>{e.preventDefault();stickId=e.pointerId;stick.setPointerCapture(e.pointerId);stickPos(e)});
+stick.addEventListener("pointermove",e=>{if(stickId===e.pointerId)stickPos(e)});
+function clearStick(e){if(stickId!==e.pointerId)return;stickId=null;touch.dx=0;touch.dy=0;nub.style.transform=""}
+stick.addEventListener("pointerup",clearStick);stick.addEventListener("pointercancel",clearStick);
+canvas.addEventListener("pointerdown",e=>{if(!on||paused)return;touch.lookId=e.pointerId;touch.lookX=e.clientX;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener("pointermove",e=>{if(e.pointerId!==touch.lookId||!on||paused)return;p.a+=clamp(e.clientX-touch.lookX,-110,110)*.005;touch.lookX=e.clientX});
+canvas.addEventListener("pointerup",e=>{if(e.pointerId===touch.lookId)touch.lookId=null});
+canvas.addEventListener("pointercancel",e=>{if(e.pointerId===touch.lookId)touch.lookId=null});
+addEventListener("keydown",e=>{const k=e.key.toLowerCase();keys.add(k);if([" ","arrowup","arrowdown","arrowleft","arrowright"].includes(k))e.preventDefault();if(k==="escape"&&on)$("pause").click()});
+addEventListener("keyup",e=>keys.delete(e.key.toLowerCase()));
+addEventListener("blur",()=>{keys.clear();touch.fire=false;touch.sprint=false});
+})();
+</script></body></html>
