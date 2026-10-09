@@ -1,6 +1,6 @@
 # Kino mobile: experimental Zombies port
 
-Open https://parancze.github.io/zomboidtury/?mobile=1 in Safari and press **Stáhnout Kino a spustit**. No manual game-file selection is required. Initial download is approximately 888 MiB, then verified data are retained in OPFS storage. Safari must provide WebGL 2 and OPFS, with sufficient available storage. Do not close the page during the first download.
+Open https://parancze.github.io/zomboidtury/?mobile=1 in Safari and press **Stáhnout Kino a spustit**. No manual game-file selection is required. Initial download is approximately 702 MiB, then verified data are retained in OPFS storage. Safari must provide WebGL 2 and OPFS, with sufficient available storage. Do not close the page during the first download.
 
 ## Deployment
 

@@ -11,7 +11,7 @@ def fetch_file(entry, destination, upstream):
         if hashlib.file_digest(target.open('rb'), 'sha256').hexdigest() == entry['sha256']:
             return
     temp = target.with_name(target.name + '.download')
-    subprocess.run(['curl', '--fail', '--location', '--retry', '3', '--max-time', '600', '--output', str(temp), upstream + '/'.join(path.parts)], check=True)
+    subprocess.run(['curl', '--fail', '--silent', '--show-error', '--compressed', '--location', '--retry', '3', '--max-time', '600', '--output', str(temp), upstream + '/'.join(path.parts)], check=True)
     if temp.stat().st_size != entry['size'] or hashlib.file_digest(temp.open('rb'), 'sha256').hexdigest() != entry['sha256']:
         temp.unlink(missing_ok=True)
         raise ValueError('Upstream integrity mismatch: ' + str(path))

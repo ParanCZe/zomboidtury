@@ -15,7 +15,7 @@
     '</div><div id="mobile-rotate">Otoč telefon na šířku</div>';
   document.body.append(panel);
   const info=document.createElement('p');info.id='mobile-info';
-  info.textContent='První stažení: přibližně 888 MiB. Data zůstanou uložená v telefonu. Experimentální Zombies port; hratelnost na iPhonu zatím není ověřená.';
+  info.textContent='První stažení: přibližně 702 MiB. Data zůstanou uložená v telefonu. Experimentální Zombies port; hratelnost na iPhonu zatím není ověřená.';
   pick.parentElement.append(info);
   const keys=new KBMobileKeys.KeyOwners((key,down)=> {if(Module._KBMobile_Key) Module._KBMobile_Key(key,Number(down));});
   let motionPointer=null, movePointer=null, previous=null, lookStart=null;
