@@ -51,6 +51,10 @@ const memoryCtor='wasmMemory=new WebAssembly.Memory({initial:INITIAL_MEMORY/6553
 if(!js.includes(memoryCtor))throw Error("Nenalezen původní konstruktor WASM paměti");
 js=js.replace(memoryCtor,'wasmMemory=Module["wasmMemory"]||new WebAssembly.Memory({initial:INITIAL_MEMORY/65536,maximum:INITIAL_MEMORY/65536,shared:true})');
 log("PATCH initMemory používá předanou wasmMemory; žádná druhá alokace");
+const alreadyTransferred='if(canvas.controlTransferredOffscreen){err(`pthread_create: cannot transfer canvas with ID "${name}" to thread, since the current thread does not have control over it!`);error=63;break}';
+if(!js.includes(alreadyTransferred))throw Error("Nenalezena Emscripten canvas-transfer větev");
+js=js.replace(alreadyTransferred,'if(canvas.controlTransferredOffscreen){console.warn("BO1Z: canvas already owned by another worker; spawn this worker without canvas transfer");continue}');
+log("PATCH duplicitní předání canvasu -> další pthread bez canvasu");
 const start="function __asyncjs__InitializeWebGPU(pipeline){",end='__asyncjs__InitializeWebGPU.sig="ii"';const a=js.indexOf(start),b=js.indexOf(end,a);
 if(a<0||b<0)throw Error("WebGPU init nenalezen");
 js=js.slice(0,a)+'function __asyncjs__InitializeWebGPU(pipeline){console.warn("BO1Z mobile forced WebGL2 fallback");return 0}'+js.slice(b);
@@ -63,13 +67,20 @@ const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
 if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5.3",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5.4",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
 let source=patch(await mjsFile.text());const bytes=await wasmFile.arrayBuffer();
 log("Original files",bytes.byteLength,"WASM bytes,",source.length,"patched JS chars");
 const compiled=await WebAssembly.compile(bytes);log("ORIGINAL WASM COMPILED");
+const wasmMemoryImport=WebAssembly.Module.imports(compiled).find(x=>x.kind==="memory");
+if(!wasmMemoryImport?.type?.minimum)throw Error("WASM nemá očekávaný memory import");
+const wasmMemorySize=wasmMemoryImport.type.minimum*65536;
+const initialMemoryLiteral="var INITIAL_MEMORY=2147418112";
+if(!source.includes(initialMemoryLiteral))throw Error("Není nalezen původní INITIAL_MEMORY");
+source=source.replace(initialMemoryLiteral,"var INITIAL_MEMORY="+wasmMemorySize);
+log("EARLY MEMORY PATCH",Math.round(wasmMemorySize/1048576)+" MiB (před importem MJS)");
 if(modURL)URL.revokeObjectURL(modURL);
 modURL=URL.createObjectURL(new Blob([source],{type:"text/javascript"}));
 const factory=(await import(modURL)).default;
@@ -82,9 +93,7 @@ try{
 const min=memoryImport?.type?.minimum??32767,max=memoryImport?.type?.maximum??32767;
 const shared=memoryImport?.type?.shared??true;
 const declared=min*65536;
-const originalLiteral="var INITIAL_MEMORY=2147418112";
-if(!source.includes(originalLiteral))throw Error("Původní Emscripten INITIAL_MEMORY nebyla nalezena");
-source=source.replace(originalLiteral,"var INITIAL_MEMORY="+declared);
+if(declared!==wasmMemorySize)throw Error("Neshoda WASM paměti");
 log("LOW MEMORY PATCH",Math.round(declared/1048576)+" MiB; matching WASM import and MJS");
 log("MEMORY REQUEST","pages="+min,"max="+max,"shared="+shared,"estimated MiB="+Math.round(min*65536/1048576));
 memory=new WebAssembly.Memory({initial:min,maximum:max,shared});
