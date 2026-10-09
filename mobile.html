@@ -275,7 +275,7 @@ if(transferOccurrences>=1){
 
 const gfxNames=["emscripten_webgl_create_context","emscripten_webgl_make_context_current","emscripten_webgl_get_current_context","WatchD3DContext","UnwatchD3DContext","RegisterWebGPUContext"];
 for(const name of gfxNames){
- const pattern=new RegExp("function\\\\s+"+name+"\\\\s*\\\\([^)]*\\\\)\\\\s*\\\\\\{","g");
+ const pattern=new RegExp("function\\s+"+name+"\\s*\\([^)]*\\)\\s*\\{","g");
  let count=0;
  js=js.replace(pattern,match=>{count++;return match+'try{err("BO1Z GFX WORKER "+'+JSON.stringify(name)+'+" called pthread="+(typeof ENVIRONMENT_IS_PTHREAD!=="undefined"?ENVIRONMENT_IS_PTHREAD:"?"))}catch(e){};'});
  log("GFX WORKER HOOK",name,count);
