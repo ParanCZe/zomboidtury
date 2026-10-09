@@ -3,12 +3,13 @@
 <body><canvas id="game" width="960" height="540"></canvas><div id="shade"></div>
 <div id="dock"><div id="look"></div><div id="joystick"><div id="nub"></div></div><div id="actions"><div class="stack"><button class="touchbtn" id="reload">NABÍT</button><button class="touchbtn" id="sprint">BĚH</button></div><button class="touchbtn" id="shoot">STŘELBA</button></div></div>
 <button id="mini">☰ BO1Z</button>
-<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.5</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
+<div id="ui"><div id="panel"><small>BO1Z · ORIGINÁLNÍ KISAKBLACK · MOBILE BOOT v2.5.5</small><h1>Spustit původní BO1Z na mobilu</h1><p>Tohle není nová zombie hra. Spouští přímo tvoje originální <code>KisakBlack-web.mjs</code> a <code>KisakBlack-web.wasm</code>. Testuje skutečné pracovní vlákno s WebGL2 fallbackem a připojuje dotykové ovládání.</p>
 <div class="warning">Experimentální port, nikoli potvrzená hratelná verze. Bez originálních balíčků map uložených pro tento web může engine skončit chybou načítání. Původní 2GB WASM na iPhonu může selhat; použij níže staženou low-memory variantu. Pokud web nehlásí <code>crossOriginIsolated: true</code>, pthread start nebude fungovat.</div>
 <label>Originální KisakBlack-web.mjs <input id="mjs" type="file"></label>
 <label>Low-memory KisakBlack-web.wasm (512 MB / 1 GB) <input id="wasm" type="file"></label>
 <small>iPhone / iPad: Výběr souborů neomezuji podle přípony, aby šly vybrat i soubory .wasm a .mjs v aplikaci Soubory.</small>
 <label>Mapa <select id="map"><option value="zombie_theater">Kino der Toten</option><option value="zombie_pentagon">Five</option><option value="zombie_cod5_prototype">Nacht der Untoten</option></select></label>
+<div class="toolbar"><button id="assetcheck" class="secondary" type="button">OVĚŘIT HERNÍ DATA / OPFS</button></div><p><small>Test stáhne jen malý vzorek dat, nikoli celou mapu. Před plným stažením (~931 MB) ověříme oprávnění a kapacitu zařízení.</small></p>
 <div class="toolbar"><button id="boot" class="primary">SPUSTIT ORIGINÁLNÍ ENGINE</button><button id="show" class="secondary" type="button">Skrýt panel</button><button id="copy" class="secondary" type="button">Kopírovat protokol</button></div>
 <div id="status">Připraveno.</div><pre id="log">Připraveno. Nejprve vyber oba originální soubory.</pre>
 <small>Souborové binárky se pouze čtou lokálně; neposílají se na GitHub ani Cloudflare. Nahrání originálních mapových dat řešíme odděleně. Dotyková tlačítka fungují pouze ve chvíli, kdy přijímá originální runtime vstupy.</small>
@@ -38,6 +39,31 @@ const keyCodes={KeyW:119,KeyA:97,KeyS:115,KeyD:100,KeyR:114,Space:32,ShiftLeft:1
 window.addEventListener("keydown",e=>{if(document.activeElement?.tagName==="INPUT"||document.activeElement?.tagName==="SELECT")return;const k=keyCodes[e.code];if(k){key(k,true);e.preventDefault()}});window.addEventListener("keyup",e=>{const k=keyCodes[e.code];if(k)key(k,false)});window.addEventListener("blur",releaseKeys);
 function showUI(show){$("ui").style.display=show?"flex":"none";$("dock").classList.toggle("show",!show);if(show)releaseKeys()}
 $("mini").onclick=()=>showUI(true);$("show").onclick=()=>showUI(false);$("copy").onclick=async()=>{try{await navigator.clipboard.writeText(logs.join("\n"));stat("Protokol zkopírován.")}catch{stat("Označ protokol a zkopíruj jej ručně.")}};
+$("assetcheck").onclick=async()=>{
+const btn=$("assetcheck");btn.disabled=true;
+try{
+log("ASSET PREFLIGHT v2.5.5","origin",location.origin);
+if(!navigator.storage?.getDirectory)throw Error("OPFS není v tomto prohlížeči dostupné");
+const estimate=await navigator.storage.estimate();
+log("OPFS STORAGE",JSON.stringify({quota:estimate.quota,usage:estimate.usage,available:(estimate.quota??0)-(estimate.usage??0)}));
+const root=await navigator.storage.getDirectory();
+const handle=await root.getFileHandle("bo1z-opfs-test.txt",{create:true});
+const stream=await handle.createWritable();await stream.write("BO1Z mobile preflight");await stream.close();
+log("OPFS WRITE", (await (await handle.getFile()).text())==="BO1Z mobile preflight"?"OK":"READ MISMATCH");
+await root.removeEntry("bo1z-opfs-test.txt");
+const manifestURL="https://vel.gg/bo1z/kino/manifest.json";
+let manifest;
+try{const res=await fetch(manifestURL,{cache:"no-store"});if(!res.ok)throw Error("HTTP "+res.status);manifest=await res.json();
+log("MANIFEST CORS OK",manifest.map,"files",manifest.files?.length,"bytes",manifest.total_bytes);
+}catch(e){log("MANIFEST CORS BLOCKED",e.message);log("NOTE Originální web možná neumožňuje cross-origin přístup; nic se nestahuje");return}
+const entry=manifest.files.find(f=>f.path==="localization.txt");
+if(!entry)throw Error("V manifestu chybí localization.txt");
+const sampleURL="https://cdn.vel.gg/packs/kino/localization.txt.br/0?v="+entry.sha256.slice(0,16);
+try{const r=await fetch(sampleURL,{cache:"no-store"});if(!r.ok)throw Error("HTTP "+r.status);const buf=await r.arrayBuffer();log("CDN SAMPLE CORS OK",buf.byteLength,"bytes","Content-Encoding",r.headers.get("content-encoding")||"none");
+}catch(e){log("CDN SAMPLE CORS BLOCKED",e.message)}
+} catch(e){log("PREFLIGHT ERROR",e.name,e.message)}
+finally{btn.disabled=false}
+};
 function patch(js){
 const substitutions=[
 ["var pthreadPoolSize=16;","var pthreadPoolSize=2;","PTHREAD pool 2"],
@@ -67,7 +93,7 @@ const wasmFile=$("wasm").files[0],mjsFile=$("mjs").files[0];
 if(!wasmFile||!mjsFile){stat("Vyber původní .mjs i .wasm.");return}
 if(!crossOriginIsolated||typeof SharedArrayBuffer==="undefined"){stat("BLOKACE: cross-origin isolation není zapnutá. Otevři Cloudflare Workers URL, ne GitHub Pages.");log("ISOLATION FAIL",location.origin);return}
 booting=true;$("boot").disabled=true;logs.length=0;
-log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5.4",new Date().toISOString());
+log("BOOT ORIGINAL KISAKBLACK – MOBILE v2.5.5",new Date().toISOString());
 log("URL",location.href,"isolated",crossOriginIsolated,"SAB",typeof SharedArrayBuffer,"JSPI",!!WebAssembly.Suspending);
 let timeout=setTimeout(()=>log("WATCHDOG: inicializace trvá déle než 25 s"),25000);
 try{
