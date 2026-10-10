@@ -31,6 +31,8 @@ jobs:
         run: |
           cd engine-source
           node tests/mobile_keys_test.cjs
+          g++ -std=c++20 -I tests/fake_emscripten tests/web_fiber_yield_test.cpp -o /tmp/web-fiber-yield-test
+          /tmp/web-fiber-yield-test
           g++ -std=c++20 tests/dxt_decode_test.cpp -o /tmp/dxt-decode-test
           /tmp/dxt-decode-test
           g++ -std=c++20 -I src tests/raw_fastfile_test.cpp src/database/db_raw.cpp -o /tmp/raw-fastfile-test
