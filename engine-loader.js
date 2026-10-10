@@ -23,7 +23,7 @@
       window.__kbRuntimeReject = reject;
     });
     const script = document.createElement('script');
-    script.src = new URL('blackops.js?v=dxt-fallback-1', document.baseURI).href;
+    script.src = new URL('blackops.js?v=fiber-yield-1', document.baseURI).href;
     script.onerror = () => window.__kbRuntimeReject(new Error('Nepodařilo se načíst blackops.js.'));
     document.body.append(script);
     await ready;

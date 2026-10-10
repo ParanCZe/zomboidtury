@@ -25,3 +25,20 @@ The available cloud browser rejected the WebGL2 context before engine startup. N
 ## Optional S3TC fallback
 
 The original 2D and cube upload code selected compressed DXT uploads by texture format even when the GL extension list reported no S3TC support. The revised source decodes DXT1/3/5 into temporary RGBA8 buffers when S3TC is unavailable, covering 2D textures, cube faces and material texture arrays. Supported contexts retain compressed uploads. Input-length and allocation-overflow checks prevent reading truncated blocks. Tests cover solid colors, DXT1 transparency, DXT3/5 alpha, both DXT5 alpha palette modes, non-multiple-of-four dimensions and truncated inputs. These tests passed under AddressSanitizer/UndefinedBehaviorSanitizer with leak detection disabled because the execution environment cannot inspect process tasks. This verifies CPU conversion; it is not evidence of a rendered scene on Safari.
+
+## 2026-10-10: startup stream fiber starvation
+
+The user's paused Wasm stack contains function 10585. The profiling-name build
+maps that function to `KB_StreamPump(unsigned int)`; its original infinite poll
+loop called `usleep(250 * 1000)` on the browser thread. Replaced that delay with
+cooperative yield only for unthreaded Emscripten. Also corrected worker yield:
+a worker always returns to the main fiber and queues itself for a later turn,
+instead of polling forever when no other worker is ready or cycling workers
+without scheduling the main fiber. Real OS-thread builds retain their delay.
+
+The scheduler regression fails against the prior policy and passes against the
+new policy. CI also passed existing input, texture decoding, fastfile and
+rounding tests, full Emscripten build, Wasm export and memory validation.
+Restored ordinary engine console output for the unthreaded build, and included
+Wasm profiling names for subsequent diagnostics. These checks do not prove
+full map gameplay or iPhone compatibility; a real browser startup remains needed.
