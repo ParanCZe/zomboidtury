@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - mobile-port.patch.gz
+      - tools/instrument_boot.py
       - .github/workflows/engine-build.yml
 permissions:
-  contents: read
+  contents: write
+  actions: write
 concurrency:
   group: mobile-engine-build
   cancel-in-progress: true
@@ -26,6 +28,9 @@ jobs:
           gzip -dc mobile-port.patch.gz > engine.patch
           git -C engine-source apply --check ../engine.patch
           git -C engine-source apply ../engine.patch
+          python3 tools/instrument_boot.py --self-test
+          python3 tools/instrument_boot.py engine-source
+          grep -q 'FS_InitFilesystem: after FS_Startup' engine-source/src/universal/com_files.cpp
       - name: Verify portable input and file readers
         shell: bash
         run: |
@@ -52,6 +57,11 @@ jobs:
           node - <<'JS'
           const fs = require('fs');
           const bytes = fs.readFileSync('engine-build/web/blackops.wasm');
+          const crypto = require('node:crypto');
+          const wasmSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+          for (const phase of ['FS_InitFilesystem: after FS_Startup', 'Com_Init: before Cbuf_Execute']) {
+            if (!bytes.includes(Buffer.from(phase))) throw new Error('Boot diagnostic phase is missing in compiled Wasm: ' + phase);
+          }
           if (!WebAssembly.validate(bytes)) throw new Error('Invalid WebAssembly');
           const compiled = new WebAssembly.Module(bytes);
           const exportedNames = new Set(WebAssembly.Module.exports(compiled).map(e => e.name));
@@ -77,10 +87,38 @@ jobs:
             partNames.push(name);
             fs.writeFileSync('engine-artifact/' + name, bytes.subarray(offset, offset + 7999998));
           }
+          if (partNames.length !== 3) throw new Error('Expected exactly three Wasm segments; web deployment assumes three');
           const loader = fs.readFileSync('engine-artifact/engine-loader.js', 'utf8');
           fs.writeFileSync('engine-artifact/engine-loader.js', loader.replace(/for \(const name of \[.*?\]\)/, 'for (const name of ' + JSON.stringify(partNames) + ')'));
-          fs.writeFileSync('engine-artifact/BUILD.json', JSON.stringify({source:'65d1eb9a21898ae43b27f93e8204dc5d03560d70', emscripten:'3.1.69', wasmBytes:bytes.length, commit:process.env.GITHUB_SHA, gameplayVerified:false}, null, 2));
+          fs.writeFileSync('engine-artifact/BUILD.json', JSON.stringify({source:'65d1eb9a21898ae43b27f93e8204dc5d03560d70', emscripten:'3.1.69', wasmBytes:bytes.length, wasmSha256, commit:process.env.GITHUB_SHA, instrumentedBoot:true, gameplayVerified:false}, null, 2));
           JS
+      - name: Publish compiled engine to main (only after verification)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp engine-artifact/blackops.js ./blackops.js
+          cp engine-artifact/blackops.wasm.001 ./blackops.wasm.001
+          cp engine-artifact/blackops.wasm.002 ./blackops.wasm.002
+          cp engine-artifact/blackops.wasm.003 ./blackops.wasm.003
+          cp engine-artifact/BUILD.json ./ENGINE_BUILD.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add blackops.js blackops.wasm.001 blackops.wasm.002 blackops.wasm.003 ENGINE_BUILD.json
+          if ! git diff --cached --quiet; then
+            git commit -m "build: rebuild traced single-threaded Zombies engine"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+      - name: Request Pages deployment for published engine
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -fsS --retry 3 -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/kino-pages.yml/dispatches" \
+            -d '{"ref":"main"}'
       - uses: actions/upload-artifact@v4
         with:
           name: experimental-mobile-zombies-engine
