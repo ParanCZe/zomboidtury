@@ -65,3 +65,28 @@ jobs:
       - name: Publish Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Smoke-check live page, launcher and required Kino archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://parancze.github.io/zomboidtury"
+          for attempt in $(seq 1 20); do
+            echo "Public site check: attempt ${attempt}/20"
+            if curl -fsSL --max-time 30 "${base}/game/manifest.json?check=${GITHUB_SHA}" -o /tmp/bo1z-live-manifest.json &&
+               curl -fsSL --max-time 30 "${base}/engine-loader.js?check=${GITHUB_SHA}" -o /tmp/bo1z-live-loader.js &&
+               curl -fsSIL --max-time 30 "${base}/game/main/localized_English_iw04.iwd?check=${GITHUB_SHA}" -o /dev/null &&
+               python3 - <<'PY'
+          import json, pathlib
+          manifest=json.loads(pathlib.Path('/tmp/bo1z-live-manifest.json').read_text())
+          assert manifest.get('map') == 'zombie_theater', 'Wrong live map'
+          assert len(manifest.get('files', [])) == 51, 'Incomplete live file list'
+          assert '180 sekund' in pathlib.Path('/tmp/bo1z-live-loader.js').read_text(), 'Stale live loader'
+          print('Live Pages: manifest, game archive and latest loader verified.')
+          PY
+            then
+              exit 0
+            fi
+            sleep 8
+          done
+          echo "ERROR: Deployed GitHub Pages did not pass live smoke test" >&2
+          exit 1
