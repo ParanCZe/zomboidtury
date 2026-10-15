@@ -16,6 +16,10 @@
 (function () {
   const KBFS = {
     ready: false,
+    diagnostic: { opens:0, readCalls:0, cachedReads:0, dirListings:0,
+      existenceChecks:0, openedArchives:0, lastPath:'', lastOp:'',
+      lastError:'', lastTimestamp:0 },
+    snapshot() { return { ...this.diagnostic }; },
     rootHandle: null,
     // Normalized-path (lowercase, '/'-separated, no leading slash) -> handle.
     index: new Map(),
@@ -173,6 +177,7 @@
 
     exists(p) {
       const np = this.norm(p);
+      this.diagnostic.existenceChecks++;
       if (this._resolve(np)) return 1;
       if (this.dirs.has(np)) return 2;
       // directory tail match
@@ -184,16 +189,22 @@
 
     async open(p) {
       const np = this.norm(p);
+      const diag = this.diagnostic;
+      diag.opens++; diag.lastPath = np; diag.lastOp = 'open';
+      diag.lastTimestamp = Date.now();
       const entry = this._resolve(np);
       if (!entry) return 0;
       // entry is a FileSystemFileHandle (secure-ctx path) OR already a File
       // (webkitdirectory fallback). Both yield a File we can Blob.slice() lazily.
-      const file = (typeof entry.getFile === "function") ? await entry.getFile() : entry;
+      let file;
+      try { file = (typeof entry.getFile === "function") ? await entry.getFile() : entry; }
+      catch (e) { diag.lastError = 'open '+np+': '+(e?.message || e); throw e; }
       const id = this.nextId++;
       // Per-file 256KB block cache: the engine parses each .iwd's zip central
       // directory with thousands of tiny sequential reads; without caching that's
       // thousands of async round-trips. One block read serves them all.
-      this.open_.set(id, { file, cache: new Map(), blockSize: 262144 });
+      this.open_.set(id, { file, path: np, cache: new Map(), blockSize: 262144 });
+      if (/\.iwd$/i.test(np)) diag.openedArchives++;
       return id;
     },
 
@@ -223,6 +234,7 @@
         out.set(blk.subarray(from, from + n), pos - offset);
         pos += n;
       }
+      this.diagnostic.cachedReads++;
       return out;
     },
 
@@ -232,6 +244,10 @@
     async pread(id, offset, len) {
       const e = this.open_.get(id);
       if (!e) return null;
+      this.diagnostic.readCalls++;
+      this.diagnostic.lastPath = e.path;
+      this.diagnostic.lastOp = 'pread '+offset+'+'+len;
+      this.diagnostic.lastTimestamp = Date.now();
       const size = e.file.size;
       const end = Math.min(offset + len, size);
       if (end <= offset) return new Uint8Array(0);
@@ -271,6 +287,10 @@
     //   * else          -> immediate child files ending ".ext" (plus immediate
     //                      subdir names if wantsubs); return base names.
     listDir(dir, ext, filter, wantsubs) {
+      this.diagnostic.dirListings++;
+      this.diagnostic.lastPath = String(dir || '');
+      this.diagnostic.lastOp = 'listDir '+String(ext || '')+' '+String(filter || '');
+      this.diagnostic.lastTimestamp = Date.now();
       let d = String(dir || "").replace(/\\/g, "/")
                 .replace(/^\.?\/+/, "").replace(/\/+$/, "").toLowerCase();
       const prefix = d ? d + "/" : "";
