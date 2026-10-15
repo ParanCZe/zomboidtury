@@ -24,8 +24,10 @@ const record = text => { log.write(text+'\n'); console.log(text); };
   });
   record('WEBGL: '+JSON.stringify(gl));
   if (!gl) throw new Error('Test environment has no WebGL2');
+  await page.click('[data-view="settings"]');
   await page.selectOption('#bm-resolution','640x360');
   await page.selectOption('#bm-audio','off');
+  await page.click('[data-view="maps"]');
   await page.click('#bm-start',{noWaitAfter:true});
   await new Promise(resolve=>setTimeout(resolve,180000));
   const snapshot = (async () => {
