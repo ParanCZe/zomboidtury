@@ -21,16 +21,32 @@ def patch(text):
     if 'g_dwTlsIndex =' in body:
         raise RuntimeError('TLS switch already present; inspect upstream before applying')
     body=body.replace(SIGNATURE, SIGNATURE+'''
-    // All fibers share the OS thread_local pointer. Restore the logical thread's
-    // five engine TLS slots, including parser/va buffers and error recovery data.
-    const int threadContext = ctx < 0 ? 0 : ctx;
-    g_dwTlsIndex = g_threadValues[threadContext];''',1)
-    return text[:start]+body+text[end:]
+    // Generic CreateThread workers use contexts >= 64, outside g_threadValues.
+    // Keep their own bank and preserve a bank selected by SetupWorkerThread /
+    // Sys_InitThread while that generic fiber was running.
+    struct GenericTls { void* slots[5] = {}; void** selected = nullptr; };
+    static std::map<int, GenericTls> genericBanks;
+    static int activeContext = -1;
+    if (activeContext >= 15 && g_dwTlsIndex)
+        genericBanks[activeContext].selected = g_dwTlsIndex;
+    if (ctx < 15)
+        g_dwTlsIndex = g_threadValues[ctx < 0 ? 0 : ctx];
+    else
+    {
+        GenericTls& bank = genericBanks[ctx];
+        g_dwTlsIndex = bank.selected ? bank.selected : bank.slots;
+    }
+    activeContext = ctx;''',1)
+    updated=text[:start]+body+text[end:]
+    return '#include <map>\n'+updated
 
 
 def verify(text):
     _,_,body=callback(text)
-    source='''void *g_threadValues[15][5];
+    source='''#include <map>
+#include <array>
+#include <cstdint>
+void *g_threadValues[15][5];
 void **g_dwTlsIndex;
 unsigned int threadId[15],g_webCurrentThreadId;
 unsigned int Sys_Web_SynthThreadId(int ctx) { return 100+ctx; }
@@ -48,6 +64,30 @@ int main() {
    if(g_webCurrentThreadId!=100)return 3;
    for(int j=0;j<5;++j)if(g_dwTlsIndex[j]!=&sentinel[0][j])return 4;
  }
+ int generic=64, second=65, genericValue=4, secondValue=5;
+ Sys_Web_OnFiberSwitch(generic);
+ // A generic bank must be separate from, and outside the end of, the fixed table.
+ const auto address=reinterpret_cast<std::uintptr_t>(g_dwTlsIndex);
+ const auto fixedStart=reinterpret_cast<std::uintptr_t>(g_threadValues);
+ const auto legacyBank=reinterpret_cast<std::uintptr_t>(g_threadValues)+64*sizeof(g_threadValues[0]);
+ if((address>=fixedStart && address<fixedStart+sizeof(g_threadValues)) || address==legacyBank)return 5;
+ if(!g_dwTlsIndex)return 6;
+ g_dwTlsIndex[1]=&genericValue;
+ Sys_Web_OnFiberSwitch(-1);
+ if(g_dwTlsIndex!=g_threadValues[0])return 7;
+ Sys_Web_OnFiberSwitch(generic);
+ if(g_dwTlsIndex[1]!=&genericValue)return 8;
+ // SetupWorkerThread calls Sys_InitThread, redirecting this worker's bank.
+ g_dwTlsIndex=g_threadValues[2];
+ Sys_Web_OnFiberSwitch(second);
+ if(g_dwTlsIndex==g_threadValues[2])return 9;
+ g_dwTlsIndex[1]=&secondValue;
+ Sys_Web_OnFiberSwitch(generic);
+ if(g_dwTlsIndex!=g_threadValues[2])return 10;
+ Sys_Web_OnFiberSwitch(second);
+ if(g_dwTlsIndex[1]!=&secondValue)return 11;
+ Sys_Web_OnFiberSwitch(-1);
+ if(g_dwTlsIndex!=g_threadValues[0])return 12;
  return 0;
 }
 '''
@@ -67,7 +107,7 @@ def apply(root):
     if not verify(fixed):
         raise RuntimeError('Per-fiber TLS isolation regression failed')
     path.write_text(fixed)
-    print('Fiber TLS: reproduced wrong TLS bank; all 15 contexts and main-thread returns verified')
+    print('Fiber TLS: fixed contexts, generic workers, selected banks and main returns verified')
 
 
 if __name__=='__main__':
