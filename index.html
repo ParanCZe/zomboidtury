@@ -59,25 +59,59 @@
   </details>
   <script>
     (function () {
-      const key='kbz-boot-log-v1', box=document.getElementById('boot-log');
-      let previous=''; try { previous=localStorage.getItem(key)||''; } catch (_) {}
+      const key='kbz-boot-log-v2', stageKey='kbz-last-boot-phase-v2';
+      const box=document.getElementById('boot-log');
+      const diagnostics=document.getElementById('boot-diagnostics');
+      let previous='', oldStage='';
+      try { previous=localStorage.getItem(key)||''; oldStage=localStorage.getItem(stageKey)||''; } catch (_) {}
       const lines=[];
-      function record(text) {
-        lines.push(new Date().toISOString()+' '+String(text).slice(0,2000));
-        if(lines.length>100)lines.shift();
-        const current=lines.join('\n');
-        box.textContent=(previous?'PŘEDCHOZÍ POKUS:\n'+previous+'\n\nAKTUÁLNÍ POKUS:\n':'')+current;
+      let dirty=false, pending=false;
+      function flush() {
+        if(!dirty)return;
+        dirty=false;
+        const current=lines.join('\\n');
+        box.textContent=(oldStage?'MINULÁ FÁZE: '+oldStage+'\\n':'')+
+          (previous?'PŘEDCHOZÍ POKUS:\\n'+previous+'\\n\\nAKTUÁLNÍ POKUS:\\n':'')+current;
         try { localStorage.setItem(key,current); } catch (_) {}
       }
+      function record(message) {
+        const line=new Date().toISOString()+' '+String(message).slice(0,2000);
+        lines.push(line);
+        if(lines.length>160)lines.shift();
+        dirty=true;
+        // Engine startup prints thousands of lines. One DOM rewrite and storage
+        // write PER LINE causes long stalls on Safari; batch updates instead.
+        if(!pending){
+          pending=true;
+          setTimeout(()=>{pending=false;flush();},350);
+        }
+      }
+      record.flush=flush;
+      record.phase=function(stage) {
+        record('FÁZE: '+stage);
+        try { localStorage.setItem(stageKey,new Date().toISOString()+' '+stage); } catch (_) {}
+        flush(); // Persist synchronously before a possibly non-yielding WASM call.
+      };
       window.KBZBootLog=record;
-      record('Diagnostika v1; '+navigator.userAgent);
+      record('Diagnostika v2; '+navigator.userAgent);
+      if(oldStage.includes('vstup do callMain'))diagnostics.open=true;
       document.getElementById('copy-boot-log').onclick=async function () {
+        flush();
         try { await navigator.clipboard.writeText(box.textContent); this.textContent='Zkopírováno'; }
         catch (_) { const range=document.createRange();range.selectNodeContents(box);const selection=getSelection();selection.removeAllRanges();selection.addRange(range); }
       };
-      addEventListener('error',e=>record('CHYBA: '+e.message));
-      addEventListener('unhandledrejection',e=>record('ODMÍTNUTO: '+String(e.reason?.stack||e.reason)));
-      addEventListener('DOMContentLoaded',()=>document.getElementById('canvas').addEventListener('webglcontextlost',()=>record('WebGL: ztracený kontext')));
+      addEventListener('error',e=>{
+        let msg='CHYBA: '+(e.message||'neznámá');
+        if(e.filename)msg+=' @ '+e.filename+':'+e.lineno+':'+e.colno;
+        if(e.error?.stack)msg+='\\n'+e.error.stack;
+        if(e.message==='Script error.'&&!e.filename)
+          msg+=' (prohlížeč nesdělil soubor ani stack; může jít o externí skript)';
+        record(msg);flush();diagnostics.open=true;
+      });
+      addEventListener('unhandledrejection',e=>{record('ODMÍTNUTO: '+String(e.reason?.stack||e.reason));flush();diagnostics.open=true;});
+      addEventListener('pagehide',flush);
+      document.addEventListener('visibilitychange',()=>{if(document.hidden)flush();});
+      addEventListener('DOMContentLoaded',()=>document.getElementById('canvas').addEventListener('webglcontextlost',()=>{record('WebGL: ztracený kontext');flush();diagnostics.open=true;}));
     })();
   </script>
   <!-- Audio autoplay-policy unlock: the browser creates the OpenAL AudioContext SUSPENDED until a
@@ -432,16 +466,21 @@
       kbEngineStarted = true;
       setStatus("Spouštění enginu…");
       // Module.run() is provided by blackops.js once the runtime is initialized.
-      const launch = () => {
-        if (document.documentElement.classList.contains("mobile")) Module._KBMobile_Enable?.(1);
-        KBZBootLog('Vstup do main / Com_Init');
-          Module.callMain(Module.arguments);
-          KBZBootLog('main předalo řízení prohlížeči');
-      };
-      KBZBootLog('Runtime připraven; předání řízení enginu');
+      // KBZLoadEngine waits for onRuntimeInitialized; starting earlier means
+      // C runtime state or the mounted filesystem may still be incomplete.
+      if (!Module.calledRun || typeof Module.callMain !== 'function')
+        throw new Error('WebAssembly runtime ještě není připravený ke spuštění.');
+      if (document.documentElement.classList.contains("mobile")) Module._KBMobile_Enable?.(1);
+      KBZBootLog.phase('runtime připraven, čekám na vykreslení stránky');
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-      if (Module.calledRun) launch();
-      else { Module.onRuntimeInitialized = launch; }
+      KBZBootLog.phase('vstup do callMain / Com_Init (pokud zde log končí, main thread nevrací řízení)');
+      setStatus("Engine: inicializace Kino…");
+      // Save the checkpoint before the engine enters a possibly synchronous loop.
+      KBZBootLog.flush();
+      Module.callMain([...Module.arguments]);
+      KBZBootLog.phase('callMain vrátil řízení prohlížeči (Asyncify nebo návrat)');
+      // This callback can return before graphics and the first Zombies round exist.
+      setStatus("Engine spuštěn, čekám na načtení mapy…");
     }
 
     document.getElementById('pick').addEventListener('click', async (ev) => {
@@ -466,7 +505,8 @@
         const reloadRequired = kbEngineStarted || window.KBZEngineNeedsReload;
         btn.disabled = !!reloadRequired;
         console.error(e);
-        KBZBootLog('Spuštění selhalo: ' + (e?.stack || e));
+        KBZBootLog.phase('spuštění selhalo: ' + (e?.stack || e));
+        document.getElementById('boot-diagnostics').open=true;
         setStatus("Spuštění selhalo: " + (e?.message || e) +
           (reloadRequired ? " Obnov stránku pro bezpečný nový pokus." : " Můžeš zkusit stažení znovu."));
       }
