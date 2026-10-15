@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify browser code, engine and game manifest
         run: |
+          node tools/prepare-engine-manifest.cjs
           node --test tests/*.test.cjs
           python3 -m py_compile tools/prepare_kino.py
       - name: Restore verified game data
@@ -31,7 +32,7 @@ jobs:
       - name: Assemble website
         run: |
           mkdir -p site/game
-          cp *.html *.js *.css blackops.wasm.* site/
+          cp *.html *.js *.css blackops.wasm.* engine-manifest.json site/
           cp -a pack-cache/. site/game/
           touch site/.nojekyll
           test "$(du -sb site | cut -f1)" -lt 1073741824
@@ -74,13 +75,17 @@ jobs:
             echo "Public site check: attempt ${attempt}/20"
             if curl -fsSL --max-time 30 "${base}/game/manifest.json?check=${GITHUB_SHA}" -o /tmp/bo1z-live-manifest.json &&
                curl -fsSL --max-time 30 "${base}/engine-loader.js?check=${GITHUB_SHA}" -o /tmp/bo1z-live-loader.js &&
+               curl -fsSL --max-time 30 "${base}/engine-manifest.json?check=${GITHUB_SHA}" -o /tmp/bo1z-live-engine.json &&
                curl -fsSIL --max-time 30 "${base}/game/main/localized_English_iw04.iwd?check=${GITHUB_SHA}" -o /dev/null &&
                python3 - <<'PY'
           import json, pathlib
           manifest=json.loads(pathlib.Path('/tmp/bo1z-live-manifest.json').read_text())
           assert manifest.get('map') == 'zombie_theater', 'Wrong live map'
           assert len(manifest.get('files', [])) == 51, 'Incomplete live file list'
-          assert '180 sekund' in pathlib.Path('/tmp/bo1z-live-loader.js').read_text(), 'Stale live loader'
+          loader=pathlib.Path('/tmp/bo1z-live-loader.js').read_text()
+          assert '180 sekund' in loader and 'script.integrity' in loader, 'Stale live loader'
+          engine=json.loads(pathlib.Path('/tmp/bo1z-live-engine.json').read_text())
+          assert engine.get('wasmBytes', 0)>10000000 and all(len(engine.get(k, ''))==64 for k in ('wasmSha256','runtimeSha256')), 'Missing engine pair manifest'
           print('Live Pages: manifest, game archive and latest loader verified.')
           PY
             then

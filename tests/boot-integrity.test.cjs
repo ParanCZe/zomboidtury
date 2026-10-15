@@ -85,18 +85,21 @@ test('KBFS resolves Windows paths and cached OPFS Blob byte ranges', async () =>
 
 test('loader retries a partial network failure, then loads the complete Wasm only once', async () => {
   const source = fs.readFileSync('engine-loader.js', 'utf8');
-  let failPart = true, appended = 0, requests = [];
+  let failPart = true, appended = 0, requests = [], runtimeScript;
+  const build = {wasmBytes:3, wasmSha256:crypto.createHash('sha256').update(Buffer.from([1,2,3])).digest('hex'), runtimeSha256:'a'.repeat(64)};
   const moduleObject = {setStatus: () => {}, onRuntimeInitialized: null};
-  const context = {window: {}, Module: moduleObject, Uint8Array, URL, console, setTimeout, clearTimeout,
+  const context = {window: {}, Module: moduleObject, Uint8Array, URL, console, setTimeout, clearTimeout, crypto:crypto.webcrypto,
+    btoa:s=>Buffer.from(s,"binary").toString("base64"),
     KBZBootLog: () => {},
     document: {
       baseURI:'https://test.invalid/zomboidtury/',
       createElement:()=>({}),
-      body:{append:() => {appended++; queueMicrotask(() => moduleObject.onRuntimeInitialized?.());}}
+      body:{append:script => {runtimeScript=script;appended++; queueMicrotask(() => moduleObject.onRuntimeInitialized?.());}}
     },
     fetch:async url => {
       const name = url.pathname.split('/').pop();
       requests.push(name);
+      if (name === 'engine-manifest.json') return {ok:true,json:async()=>build};
       if (name === 'blackops.wasm.002' && failPart) return {ok:false,status:503};
       return {ok:true,arrayBuffer:async() => Uint8Array.of(name.endsWith('001')?1:name.endsWith('002')?2:3).buffer};
     }
@@ -108,6 +111,9 @@ test('loader retries a partial network failure, then loads the complete Wasm onl
   await context.window.KBZLoadEngine();
   assert.deepEqual(Array.from(moduleObject.wasmBinary),[1,2,3]);
   assert.equal(appended,1,'Never inject the runtime script twice');
+  assert.equal(runtimeScript.crossOrigin,'anonymous','Safari must expose runtime error details');
+  assert.equal(runtimeScript.integrity,'sha256-'+Buffer.from(build.runtimeSha256,'hex').toString('base64'));
+  assert.equal(new URL(runtimeScript.src).searchParams.get('v'),build.runtimeSha256,'Runtime cache key must identify this exact build');
   await context.window.KBZLoadEngine();
   assert.equal(appended,1,'Never initialize the runtime twice');
   assert.equal(requests.filter(name => name === 'blackops.wasm.001').length,2);
@@ -128,4 +134,21 @@ test('BO1Z menu opens before download and offers only installed maps', () => {
   assert.doesNotMatch(menu, /\bfetch\s*\(/, 'Menu must never fetch game data just by opening the page');
   assert.match(menu, /searchParams\.set\('rmode'/, 'Video settings must be passed to preRun');
   assert.match(menu, /searchParams\.set\('fps'/, 'FPS must be passed to preRun');
+});
+
+test('loader refuses mixed or corrupted Wasm before executing any runtime script', async () => {
+  const build={wasmBytes:3,wasmSha256:crypto.createHash('sha256').update(Buffer.from([1,2,3])).digest('hex'),runtimeSha256:'b'.repeat(64)};
+  let appended=0;
+  const moduleObject={setStatus:()=>{}};
+  const context={window:{},Module:moduleObject,URL,Uint8Array,crypto:crypto.webcrypto,
+    console:{error:()=>{}},setTimeout,clearTimeout,KBZBootLog:()=>{},
+    btoa:s=>Buffer.from(s,'binary').toString('base64'),
+    document:{baseURI:'https://test.invalid/',createElement:()=>({}),body:{append:()=>{appended++;queueMicrotask(()=>moduleObject.onRuntimeInitialized?.());}}},
+    fetch:async url=>url.pathname.endsWith('engine-manifest.json')?
+      {ok:true,json:async()=>build}:{ok:true,arrayBuffer:async()=>Uint8Array.of(9).buffer}
+  };
+  vm.createContext(context);vm.runInContext(fs.readFileSync('engine-loader.js','utf8'),context);
+  await assert.rejects(context.window.KBZLoadEngine(), /SHA-256|integrit/i);
+  assert.equal(appended,0,'Never execute glue for a mismatched binary');
+  assert.equal(moduleObject.wasmBinary,undefined,'Never give unverified bytes to Emscripten');
 });
