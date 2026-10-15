@@ -6,7 +6,7 @@ html.game-loading #bar{display:none!important}
 html.game-loading #mobile-controls{visibility:hidden;pointer-events:none!important}
 html.game-loading #boot-diagnostics{position:relative}
 #bo1z-menu{position:fixed;inset:0;z-index:100000;overflow:auto;overscroll-behavior:contain;isolation:isolate;background:radial-gradient(ellipse at 77% 8%,#29231a 0%,transparent 44%),linear-gradient(145deg,#131619 0%,#090b0c 56%,#111213 100%);color:#e7e4de;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-#bo1z-menu[hidden]{display:none!important}
+#bo1z-menu[hidden],#bo1z-menu [hidden]{display:none!important}
 #bo1z-menu:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.12;background:repeating-linear-gradient(0deg,transparent 0,transparent 3px,#c3bbac 4px);mix-blend-mode:overlay}
 #bo1z-menu *{box-sizing:border-box}
 #bo1z-menu .bm-inner{position:relative;max-width:1150px;min-height:100%;margin:auto;padding:clamp(19px,4vw,44px);display:flex;flex-direction:column}
