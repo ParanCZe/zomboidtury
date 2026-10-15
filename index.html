@@ -243,7 +243,16 @@
       canvas: (function () { return document.getElementById('canvas'); })(),
       arguments: ['+set','fs_b','/','+set','fs_h','/','+set','bo1_zombies','1','+set','zombiemode','1','+set','r_fullscreen','0','+set','r_clear','0','+set','com_maxfps','30','+devmap','zombie_theater'],   // ?map=<name> overrides; edit or add +set dvar value
       noInitialRun: true,            // we call run() ourselves after data is ready
-      print:    (t) => { console.log(t); KBZBootLog(t); },
+      print:    (t) => {
+        console.log(t); KBZBootLog(t);
+        // FS_Startup prints its final IWD file count when archive indexing ends.
+        if (/\\d+ files in iwd files/i.test(String(t))) {
+          if (window.__KBFSWatchTimer) clearInterval(window.__KBFSWatchTimer);
+          window.__KBFSWatchTimer = null;
+          KBZBootLog.phase('FS_Startup dokončen: '+t);
+          document.getElementById('status').textContent = 'Archivy načteny, pokračuji do herního enginu…';
+        }
+      },
       printErr: (t) => { console.warn(t); KBZBootLog(t); try { if (/error|abort|exception|fail|fatal|GL_INVALID|context/i.test(t)) window.__kbShowErr && window.__kbShowErr(t); } catch(e){} },
       onAbort:  (w) => { try { window.__kbShowErr && window.__kbShowErr('[abort] ' + w); } catch(e){} },
       setStatus: (t) => { if (t) { document.getElementById('status').textContent = t; KBZBootLog(t); } },
@@ -505,10 +514,12 @@
               ' asynchronních čtení, '+d.cachedReads+' čtení z cache; POSLEDNÍ '+
               d.lastOp+' '+d.lastPath+(d.lastError ? '; CHYBA '+d.lastError : ''));
           }
-          if (unchangedIntervals >= 5 && d.openedArchives === 0) {
-            // Not a conclusive crash: a synchronous engine loop may still run.
+          if (unchangedIntervals >= 5) {
+            // A stalled read or synchronous scan is still possible; report
+            // observation, not a certain crash.
             document.getElementById('status').textContent =
-              'FS_Startup zatím neotevřel žádný IWD. Poslední krok: '+d.lastOp+' '+d.lastPath;
+              'FS_Startup bez viditelného pokroku ('+d.openedArchives+
+              ' archivů). Poslední: '+d.lastOp+' '+d.lastPath;
           }
         }, 3000);
       }
