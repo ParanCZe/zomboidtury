@@ -11,10 +11,16 @@ const record = text => { log.write(text+'\n'); console.log(text); };
   ]});
   const context = await browser.newContext({viewport:{width:960,height:540}});
   const page = await context.newPage();
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Profiler.enable');
   page.on('console', m => record(m.type()+': '+m.text()));
   page.on('pageerror', e => record('PAGE ERROR: '+e.stack));
   page.on('crash', () => record('PAGE CRASH'));
   await page.goto('http://127.0.0.1:8765/?mobile=1');
+  await page.evaluate(() => {
+    const phase=window.KBZBootLog.phase;
+    window.KBZBootLog.phase=(message)=>{console.log('[PHASE] '+message);return phase(message);};
+  });
   const gl = await page.evaluate(() => {
     const c=document.createElement('canvas').getContext('webgl2');
     if (!c) return null;
@@ -28,8 +34,17 @@ const record = text => { log.write(text+'\n'); console.log(text); };
   await page.selectOption('#bm-resolution','640x360');
   await page.selectOption('#bm-audio','off');
   await page.click('[data-view="maps"]');
+  await cdp.send('Profiler.start');
   await page.click('#bm-start',{noWaitAfter:true});
   await new Promise(resolve=>setTimeout(resolve,180000));
+  const profileResult = await Promise.race([cdp.send('Profiler.stop'),new Promise(resolve=>setTimeout(()=>resolve(null),5000))]);
+  if (profileResult) {
+    fs.writeFileSync('gameplay-report/profile.json',JSON.stringify(profileResult.profile));
+    const counts=new Map();
+    for(const id of profileResult.profile.samples||[])counts.set(id,(counts.get(id)||0)+1);
+    const hot=profileResult.profile.nodes.map(n=>({samples:counts.get(n.id)||0,frame:n.callFrame})).sort((a,b)=>b.samples-a.samples).slice(0,25);
+    record('CPU PROFILE: '+JSON.stringify(hot));
+  }
   const snapshot = (async () => {
     const state = await page.evaluate(() => ({status:document.getElementById('status')?.textContent,
       fs:Module.KBFS?.snapshot(),started:Module.calledRun,canvas:{width:Module.canvas.width,height:Module.canvas.height}}));
