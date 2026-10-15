@@ -92,35 +92,66 @@ jobs:
           fs.writeFileSync('engine-artifact/engine-loader.js', loader.replace(/for \(const name of \[.*?\]\)/, 'for (const name of ' + JSON.stringify(partNames) + ')'));
           fs.writeFileSync('engine-artifact/BUILD.json', JSON.stringify({source:'65d1eb9a21898ae43b27f93e8204dc5d03560d70', emscripten:'3.1.69', wasmBytes:bytes.length, wasmSha256, commit:process.env.GITHUB_SHA, instrumentedBoot:true, gameplayVerified:false}, null, 2));
           JS
-      - name: Publish compiled engine to main (only after verification)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: experimental-mobile-zombies-engine
+          path: engine-artifact/
+          retention-days: 14
+
+  publish:
+    name: Publish verified engine on GitHub runner
+    needs: engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: experimental-mobile-zombies-engine
+          path: engine-artifact
+      - name: Verify artifact content before replacing live engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'JS'
+          const fs=require('node:fs');
+          const crypto=require('node:crypto');
+          const meta=JSON.parse(fs.readFileSync('engine-artifact/BUILD.json','utf8'));
+          const parts=['001','002','003'].map(s=>fs.readFileSync('engine-artifact/blackops.wasm.'+s));
+          const bytes=Buffer.concat(parts);
+          if(bytes.length!==meta.wasmBytes) throw new Error('Size mismatch between build metadata and artifact');
+          if(crypto.createHash('sha256').update(bytes).digest('hex')!==meta.wasmSha256) throw new Error('Engine artifact integrity failure');
+          if(meta.instrumentedBoot!==true) throw new Error('New engine lacks boot checkpoints');
+          if(!WebAssembly.validate(bytes)) throw new Error('New Wasm invalid');
+          if(!fs.statSync('engine-artifact/blackops.js').size) throw new Error('New JS engine missing');
+          console.log('Verified traced engine: '+meta.wasmBytes+' bytes');
+          JS
+      - name: Commit traced engine from checked-out repository
         shell: bash
         run: |
           set -euo pipefail
           cp engine-artifact/blackops.js ./blackops.js
-          cp engine-artifact/blackops.wasm.001 ./blackops.wasm.001
-          cp engine-artifact/blackops.wasm.002 ./blackops.wasm.002
-          cp engine-artifact/blackops.wasm.003 ./blackops.wasm.003
+          for part in 001 002 003; do cp "engine-artifact/blackops.wasm.$part" "./blackops.wasm.$part"; done
           cp engine-artifact/BUILD.json ./ENGINE_BUILD.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add blackops.js blackops.wasm.001 blackops.wasm.002 blackops.wasm.003 ENGINE_BUILD.json
           if ! git diff --cached --quiet; then
-            git commit -m "build: rebuild traced single-threaded Zombies engine"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            git commit -m "build: publish instrumented BO1Z WebAssembly engine"
+            git push origin HEAD:main
           fi
-      - name: Request Pages deployment for published engine
+      - name: Deploy compiled engine and complete map pack
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           curl -fsS --retry 3 -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/kino-pages.yml/dispatches" \
             -d '{"ref":"main"}'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: experimental-mobile-zombies-engine
-          path: engine-artifact/
-          retention-days: 14
