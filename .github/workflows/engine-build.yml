@@ -34,6 +34,7 @@ jobs:
           python3 tools/instrument_renderer.py --self-test
           python3 tools/instrument_renderer.py engine-source
           grep -q 'FS_InitFilesystem: after FS_Startup' engine-source/src/universal/com_files.cpp
+          grep -q 'DB wait: still waiting for databaseCompletedEvent' engine-source/src/qcommon/threads.cpp
       - name: Verify portable input and file readers
         shell: bash
         run: |
@@ -62,7 +63,7 @@ jobs:
           const bytes = fs.readFileSync('engine-build/web/blackops.wasm');
           const crypto = require('node:crypto');
           const wasmSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
-          for (const phase of ['FS_InitFilesystem: after FS_Startup', 'Com_Init: before Cbuf_Execute', 'DB sync: before Sys_SyncDatabase', 'DB gfx: after explicit DB_SyncXAssets', 'Renderer: backend CreateDevice succeeded']) {
+          for (const phase of ['FS_InitFilesystem: after FS_Startup', 'Com_Init: before Cbuf_Execute', 'DB sync: before Sys_SyncDatabase', 'DB gfx: after explicit DB_SyncXAssets', 'Renderer: backend CreateDevice succeeded', 'DB wait: still waiting for databaseCompletedEvent']) {
             if (!bytes.includes(Buffer.from(phase))) throw new Error('Boot diagnostic phase is missing in compiled Wasm: ' + phase);
           }
           if (!WebAssembly.validate(bytes)) throw new Error('Invalid WebAssembly');
