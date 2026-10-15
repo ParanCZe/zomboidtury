@@ -42,3 +42,22 @@ rounding tests, full Emscripten build, Wasm export and memory validation.
 Restored ordinary engine console output for the unthreaded build, and included
 Wasm profiling names for subsequent diagnostics. These checks do not prove
 full map gameplay or iPhone compatibility; a real browser startup remains needed.
+
+
+## 2026-10-15: bounded IWD scans
+
+Safari report `12:43:31` stops between `FS archive: before FS_LoadZipFile`
+and its return for `main/iw_01.iwd`. Both ZIP directory passes in this
+function can perform arbitrarily many synchronous cached reads without
+returning to the browser. The seven-second JavaScript progress timer cannot
+run during this work, so absence of timer output does not prove an I/O deadlock.
+
+`tools/fix_archive_scan.py` yields through the existing single-thread Asyncify
+boot helper every 128 archive entries, records the archive name, pass and entry
+count, and records the open/allocation/checksum boundaries. It preserves ZIP
+traversal and does not skip archives or remove game assets. The native build's
+boot helper remains a no-op. The build runs an extracted-loop C++ regression
+against both unmodified and transformed loops, including zero/partial scans and
+128-entry batch boundaries. This verifies bounded cooperative work, not actual
+Safari startup or Kino gameplay. A browser retest is still required to identify
+any remaining failure after the newly visible checkpoints.
