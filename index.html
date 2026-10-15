@@ -246,7 +246,7 @@
       print:    (t) => {
         console.log(t); KBZBootLog(t);
         // FS_Startup prints its final IWD file count when archive indexing ends.
-        if (/\\d+ files in iwd files/i.test(String(t))) {
+        if (/\d+ files in iwd files/i.test(String(t))) {
           if (window.__KBFSWatchTimer) clearInterval(window.__KBFSWatchTimer);
           window.__KBFSWatchTimer = null;
           KBZBootLog.phase('FS_Startup dokončen: '+t);
