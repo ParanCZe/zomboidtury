@@ -18,10 +18,11 @@
      canvas); main() runs on a proxied worker. The <canvas id="canvas"> below stays on
      this DOM thread — the worker's GL context targets "#canvas" and proxies to it.
 -->
-<html lang="en">
+<html lang="cs" class="menu-open">
 <head>
 <meta charset="utf-8" />
-<title>KisakBlack (WebGL2)</title>
+<title>BO1Z · Zombies na mobilu</title>
+<link rel="stylesheet" href="bo1z-menu.css?v=1" />
 <!-- This published engine is SINGLE-THREADED (unshared 512 MiB memory).
      COOP/COEP is not required. The old isolation service worker can survive
      across versions and interfere with script / resource requests. -->
@@ -54,6 +55,97 @@
 </style>
 </head>
 <body>
+<div id="bo1z-menu" aria-label="BO1Z hlavní nabídka">
+  <div class="bm-inner">
+    <header class="bm-top">
+      <div class="bm-brand">BO1Z <small>BLACK OPS ZOMBIES · MOBILE EXPERIMENT</small></div>
+      <div class="bm-subbrand">SOLO ZOMBIES<br/>ORIGINAL ENGINE EXPERIMENT</div>
+    </header>
+    <section id="bm-home">
+      <nav class="bm-nav" role="tablist" aria-label="Hlavní nabídka">
+        <button type="button" class="bm-tab" data-view="maps" role="tab" aria-selected="true">Výběr mapy</button>
+        <button type="button" class="bm-tab" data-view="settings" role="tab" aria-selected="false">Nastavení</button>
+      </nav>
+      <div class="bm-view" data-page="maps">
+        <span class="bm-kicker">Survival / Solo</span>
+        <h1>Vyber<br/>svou mapu.</h1>
+        <p class="bm-lede">Nejdřív si vyber mapu. Herní data se začnou stahovat nebo ověřovat až po stisknutí tlačítka Hrát.</p>
+        <div class="bm-maps" role="group" aria-label="Dostupné mapy">
+          <button type="button" class="bm-map" data-map="zombie_theater" aria-pressed="true">
+            <span class="bm-map-number">01 / DOSTUPNÁ</span>
+            <span class="bm-map-name">Kino der Toten</span>
+            <span class="bm-map-tag">Berlín · divadlo · BO1</span>
+          </button>
+          <button type="button" class="bm-map" data-map="zombie_pentagon" aria-pressed="false" disabled title="Mapa zatím není implementovaná">
+            <span class="bm-map-number">02 / NEDOSTUPNÁ</span>
+            <span class="bm-map-name">Five</span>
+            <span class="bm-map-tag">Další fáze projektu</span>
+          </button>
+          <button type="button" class="bm-map" data-map="zombie_cosmodrome" aria-pressed="false" disabled title="Mapa zatím není implementovaná">
+            <span class="bm-map-number">03 / NEDOSTUPNÁ</span>
+            <span class="bm-map-name">Ascension</span>
+            <span class="bm-map-tag">Další fáze projektu</span>
+          </button>
+        </div>
+        <div class="bm-toolbar">
+          <p class="bm-caption"><strong>KINO DER TOTEN</strong> · první stažení přibližně 702 MiB. Soubory se uloží do telefonu. Při dalším spuštění se ověří uložená data.</p>
+          <button id="bm-start" class="bm-play" type="button">▶ Hrát Kino der Toten</button>
+        </div>
+      </div>
+      <div class="bm-view" data-page="settings" hidden>
+        <span class="bm-kicker">Před spuštěním hry</span>
+        <h1>Nastavení.</h1>
+        <p class="bm-lede">Volby se uloží v prohlížeči a použijí při příštím spuštění enginu.</p>
+        <div class="bm-settings">
+          <div class="bm-field"><label for="bm-resolution">Rozlišení vykreslování</label>
+            <select id="bm-resolution">
+              <option value="640x360">Nízké · 640 × 360</option>
+              <option value="960x540">Vyvážené · 960 × 540</option>
+              <option value="1280x720">Vysoké · 1280 × 720</option>
+            </select>
+          </div>
+          <div class="bm-field"><label for="bm-fps">Limit snímků</label>
+            <select id="bm-fps">
+              <option value="30">30 FPS · doporučeno pro mobil</option>
+              <option value="45">45 FPS</option>
+              <option value="60">60 FPS</option>
+            </select>
+          </div>
+          <div class="bm-field"><label for="bm-textures">Detaily textur</label>
+            <select id="bm-textures">
+              <option value="standard">Šetrné · menší nároky na paměť</option>
+              <option value="high">Vysoké · plné rozlišení</option>
+            </select>
+          </div>
+          <div class="bm-field"><label for="bm-audio">Zvuk</label>
+            <select id="bm-audio">
+              <option value="on">Zapnutý</option>
+              <option value="off">Vypnutý</option>
+            </select>
+          </div>
+        </div>
+        <p class="bm-notice">Změny se použijí až po stisknutí Hrát. Vysoké detaily mohou iPhonu způsobit nedostatek paměti. Hratelnost Zombies zatím není potvrzená.</p>
+        <div class="bm-toolbar">
+          <span class="bm-caption">Nastavení se ukládá automaticky.</span>
+          <button type="button" id="bm-back" class="bm-play">← Zpět na mapy</button>
+        </div>
+      </div>
+    </section>
+    <section id="bm-loading" class="bm-loading" hidden aria-live="polite">
+      <div class="bm-spinner" aria-hidden="true"></div>
+      <span class="bm-kicker">Kino der Toten</span>
+      <h2 class="bm-load-title">Připravuji hru.</h2>
+      <p class="bm-load-state" id="bm-progress">Kontroluji podporu grafiky a dostupnost herních souborů…</p>
+      <p class="bm-notice">Při prvním spuštění se data stahují. Již ověřené soubory by měly zůstat uložené.</p>
+      <div class="bm-load-actions">
+        <button type="button" id="bm-show" class="bm-small-btn">Zobrazit engine / diagnostiku</button>
+        <button type="button" id="bm-cancel" class="bm-small-btn">Zpět do nabídky</button>
+      </div>
+    </section>
+    <footer class="bm-foot">BO1Z · Soukromý technický experiment · Bez streamování</footer>
+  </div>
+</div>
+
   <!-- On-page error console: surfaces startup failures (e.g. an OffscreenCanvas/de-proxy
        black-screen) as visible red text to screenshot, even when the dev console is closed. -->
   <div id="kberr" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#600;color:#fff;font:12px/1.4 monospace;white-space:pre-wrap;max-height:45%;overflow:auto;padding:6px;display:none"></div>
@@ -565,5 +657,6 @@
   </script>
   <script src="mobile-keys.js"></script>
   <script src="mobile-ui.js"></script>
+  <script src="bo1z-menu.js?v=1"></script>
 </body>
 </html>
