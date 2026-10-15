@@ -81,7 +81,7 @@ test('loader retries a partial network failure, then loads the complete Wasm onl
   const source = fs.readFileSync('engine-loader.js', 'utf8');
   let failPart = true, appended = 0, requests = [];
   const moduleObject = {setStatus: () => {}, onRuntimeInitialized: null};
-  const context = {window: {}, Module: moduleObject, Uint8Array, URL, console,
+  const context = {window: {}, Module: moduleObject, Uint8Array, URL, console, setTimeout, clearTimeout,
     KBZBootLog: () => {},
     document: {
       baseURI:'https://test.invalid/zomboidtury/',
