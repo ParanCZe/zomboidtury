@@ -91,6 +91,38 @@ FILESYSTEM_CHECKPOINTS = [
      '    if ( !FS_IsBasePathValid() )'),
 ]
 
+# Keep these checkpoints synchronous: yielding here could schedule a database
+# fiber while filesystem globals are only partially initialized.
+STARTUP_CHECKPOINTS = [
+    ('    FS_RegisterDvars();',
+     '    KB_WebBootPhase("FS_Startup: before FS_RegisterDvars");\n'
+     '    FS_RegisterDvars();\n'
+     '    KB_WebBootPhase("FS_Startup: after FS_RegisterDvars");'),
+    ('    Com_ReadCDKey();',
+     '    KB_WebBootPhase("FS_Startup: directories indexed; before Com_ReadCDKey");\n'
+     '    Com_ReadCDKey();\n'
+     '    KB_WebBootPhase("FS_Startup: after Com_ReadCDKey");'),
+]
+REGISTER_CHECKPOINTS = [
+    ('    v1 = (char *)Sys_DefaultCDPath();',
+     '    KB_WebBootPhase("FS_RegisterDvars: initial dvars registered; before default CD path");\n'
+     '    v1 = (char *)Sys_DefaultCDPath();'),
+    ('    v2 = Sys_Cwd();',
+     '    KB_WebBootPhase("FS_RegisterDvars: before working directory");\n'
+     '    v2 = Sys_Cwd();'),
+    ('    FS_GetOsFolderPath(5, ospathPersonalDocuments);',
+     '    KB_WebBootPhase("FS_RegisterDvars: before personal documents path");\n'
+     '    FS_GetOsFolderPath(5, ospathPersonalDocuments);\n'
+     '    KB_WebBootPhase("FS_RegisterDvars: after personal documents path");'),
+]
+ARCHIVE_CHECKPOINTS = [
+    ('        ZipFile = FS_LoadZipFile(ospath, s0[i]);',
+     '        KB_WebBootPhase(ospath);\n'
+     '        KB_WebBootPhase("FS archive: before FS_LoadZipFile");\n'
+     '        ZipFile = FS_LoadZipFile(ospath, s0[i]);\n'
+     '        KB_WebBootPhase("FS archive: after FS_LoadZipFile");'),
+]
+
 def inject_once(body: str, old: str, new: str, label: str) -> str:
     n = body.count(old)
     if n != 1:
@@ -141,6 +173,15 @@ def apply(root: Path):
             r'^void (?:__cdecl )?\w+\s*\(',
             ('#include "com_files.h"', '#include "com_files.h"\n#include <qcommon/boot_trace_web.h>'),
             FILESYSTEM_CHECKPOINTS)
+        # Include was already installed above; no duplicate include insertion.
+        for signature, checkpoints in (
+            (r'^void __cdecl FS_Startup\s*\(', STARTUP_CHECKPOINTS),
+            (r'^void FS_RegisterDvars\s*\(', REGISTER_CHECKPOINTS),
+            (r'^void __cdecl FS_AddIwdFilesForGameDirectory\s*\(', ARCHIVE_CHECKPOINTS),
+        ):
+            transform(filesystem, signature, r'^void (?:__cdecl )?\w+\s*\(',
+                      ('#include <qcommon/boot_trace_web.h>',
+                       '#include <qcommon/boot_trace_web.h>'), checkpoints)
         header.write_text(HEADER)
     except Exception:
         for p, data in originals.items():
@@ -166,6 +207,11 @@ def self_test():
         pass
     else:
         raise AssertionError('source drift was not detected')
+    for group in (STARTUP_CHECKPOINTS, REGISTER_CHECKPOINTS, ARCHIVE_CHECKPOINTS):
+        body = '\n'.join(old for old, _ in group)
+        for old, new in group:
+            body = inject_once(body, old, new, 'self-test FS detail')
+        assert 'KB_WebBootPhase(' in body
     print('[boot-trace] source anchors, checkpoint insertion and drift detection PASS')
 
 if __name__ == '__main__':
