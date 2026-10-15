@@ -27,7 +27,19 @@
     script.onerror = () => window.__kbRuntimeReject(new Error('Nepodařilo se načíst blackops.js.'));
     runtimeScriptInjected = true;
     document.body.append(script);
-    await ready;
+    // A failed platform/graphics initialization must not leave the button spinning
+    // forever. Three minutes leaves room for slow initial Wasm compilation on iOS.
+    let watchdog;
+    try {
+      await Promise.race([
+        ready,
+        new Promise((_, reject) => {
+          watchdog = setTimeout(() => reject(new Error('WebAssembly se do 180 sekund neinicializovalo. Zkontroluj diagnostiku a obnov stránku.')), 180000);
+        })
+      ]);
+    } finally {
+      clearTimeout(watchdog);
+    }
   } catch (error) {
     console.error(error);
     // A download failure is safe to retry; after the runtime script is injected,
