@@ -1,6 +1,6 @@
 // Join transport-sized parts of the compiled Zombies engine.
 (function () {
-  let loading;
+  let loading, runtimeScriptInjected = false;
   window.KBZLoadEngine = () => loading ||= (async function () {
   try {
     Module.setStatus('Načítání enginu…');
@@ -25,11 +25,16 @@
     const script = document.createElement('script');
     script.src = new URL('blackops.js?v=fiber-yield-1', document.baseURI).href;
     script.onerror = () => window.__kbRuntimeReject(new Error('Nepodařilo se načíst blackops.js.'));
+    runtimeScriptInjected = true;
     document.body.append(script);
     await ready;
   } catch (error) {
     console.error(error);
-    Module.setStatus('Chyba načítání enginu: ' + error.message);
+    // A download failure is safe to retry; after the runtime script is injected,
+    // retrying without reloading could initialize the engine twice.
+    if (!runtimeScriptInjected) loading = null;
+    else window.KBZEngineNeedsReload = true;
+    Module.setStatus('Chyba načítání enginu: ' + error.message + (runtimeScriptInjected ? ' Obnov stránku před dalším pokusem.' : ' Stažení lze opakovat.'));
     throw error;
   }
   })();
