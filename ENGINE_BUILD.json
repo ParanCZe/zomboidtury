@@ -1,9 +1,9 @@
 {
   "source": "65d1eb9a21898ae43b27f93e8204dc5d03560d70",
   "emscripten": "3.1.69",
-  "wasmBytes": 18552153,
-  "wasmSha256": "0972af3f1ed98d45b2431229c40c87917b8709e6ebf2e4c4ec5a16f29f9d17da",
-  "commit": "e2a356c7c8d6f8b09dbdae5a37e84dfcafb6c30e",
+  "wasmBytes": 18552960,
+  "wasmSha256": "5e06b5d7bdd5e634ffb52c034837d552ad9b288f63c287dbb39083fba0bad4ae",
+  "commit": "fe2776ced8137d2d27bdc9411c4b6df6bfdca663",
   "instrumentedBoot": true,
   "gameplayVerified": false
 }
