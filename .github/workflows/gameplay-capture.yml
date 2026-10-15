@@ -1,0 +1,40 @@
+name: Capture real engine boot with WebGL2
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - tools/capture-gameplay.cjs
+      - .github/workflows/gameplay-capture.yml
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/cache@v4
+        with:
+          path: pack-cache
+          key: kino-${{ hashFiles('kino-manifest.json') }}
+      - name: Prepare verified engine and game data
+        run: |
+          node tools/prepare-engine-manifest.cjs
+          python3 tools/prepare_kino.py --destination pack-cache
+          ln -s pack-cache game
+          npm install --no-save --package-lock=false playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Capture actual browser startup
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/gameplay-http.log 2>&1 &
+          node tools/capture-gameplay.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gameplay-report
+          path: gameplay-report/
+          retention-days: 7
