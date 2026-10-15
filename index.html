@@ -22,15 +22,28 @@
 <head>
 <meta charset="utf-8" />
 <title>KisakBlack (WebGL2)</title>
-<!-- GitHub Pages cannot set COOP/COEP response headers. This service worker
-     supplies them and reloads once so the pthread build can use SharedArrayBuffer. -->
+<!-- This published engine is SINGLE-THREADED (unshared 512 MiB memory).
+     COOP/COEP is not required. The old isolation service worker can survive
+     across versions and interfere with script / resource requests. -->
 <script>
-  // The experimental mobile build is single-threaded and needs no isolation worker.
-  if (!new URLSearchParams(location.search).has('mobile') && !matchMedia('(pointer: coarse)').matches) {
-    const workerScript = document.createElement('script');
-    workerScript.src = 'coi-serviceworker.js'; document.head.append(workerScript);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(async registrations => {
+      const legacy = registrations.filter(r =>
+        [r.active, r.waiting, r.installing].some(w =>
+          w && /\/coi-serviceworker\.js(?:\?|$)/.test(w.scriptURL || '')));
+      if (!legacy.length) return;
+      await Promise.all(legacy.map(r => r.unregister()));
+      // An already controlling worker remains until navigation. Reload once,
+      // before the game/download starts; OPFS game data are not affected.
+      if (navigator.serviceWorker.controller &&
+          /\/coi-serviceworker\.js(?:\?|$)/.test(navigator.serviceWorker.controller.scriptURL || '') &&
+          !sessionStorage.getItem('kbz-old-coi-reloaded')) {
+        sessionStorage.setItem('kbz-old-coi-reloaded', '1');
+        location.reload();
+      }
+    }).catch(e => console.warn('Old isolation service worker cleanup:', e));
   }
-</script>
+
 <style>
   body { margin: 0; background: #111; color: #ddd; font-family: system-ui, sans-serif; }
   #bar { padding: 8px 12px; background: #1c1c1c; display: flex; gap: 12px; align-items: center; }
