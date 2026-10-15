@@ -460,7 +460,16 @@
         setStatus(`Ověřeno ${n} souborů. Spouštění…`);
         btn.disabled = true; btn.blur();   // Enter must never re-trigger the pick/boot
         await startEngine();
-      } catch (e) { btn.disabled = false; console.error(e); setStatus("Spuštění selhalo: " + e.message); }
+      } catch (e) {
+        // Failed download: allow retry. Failed/partial runtime initialization:
+        // prevent a second callMain and clearly request a page reload instead.
+        const reloadRequired = kbEngineStarted || window.KBZEngineNeedsReload;
+        btn.disabled = !!reloadRequired;
+        console.error(e);
+        KBZBootLog('Spuštění selhalo: ' + (e?.stack || e));
+        setStatus("Spuštění selhalo: " + (e?.message || e) +
+          (reloadRequired ? " Obnov stránku pro bezpečný nový pokus." : " Můžeš zkusit stažení znovu."));
+      }
     });
 
   </script>
