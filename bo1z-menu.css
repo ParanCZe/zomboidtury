@@ -1,0 +1,64 @@
+/* BO1Z home screen. This menu does not initialize or download game data. */
+:root{color-scheme:dark}
+html.menu-open,html.menu-open body{overflow:hidden}
+html.menu-open #bar,html.menu-open #boot-diagnostics,html.menu-open #mobile-controls,html.menu-open #kberr{display:none!important}
+html.game-loading #bar{display:none!important}
+html.game-loading #mobile-controls{visibility:hidden;pointer-events:none!important}
+html.game-loading #boot-diagnostics{position:relative}
+#bo1z-menu{position:fixed;inset:0;z-index:100000;overflow:auto;overscroll-behavior:contain;isolation:isolate;background:radial-gradient(ellipse at 77% 8%,#29231a 0%,transparent 44%),linear-gradient(145deg,#131619 0%,#090b0c 56%,#111213 100%);color:#e7e4de;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+#bo1z-menu[hidden]{display:none!important}
+#bo1z-menu:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.12;background:repeating-linear-gradient(0deg,transparent 0,transparent 3px,#c3bbac 4px);mix-blend-mode:overlay}
+#bo1z-menu *{box-sizing:border-box}
+#bo1z-menu .bm-inner{position:relative;max-width:1150px;min-height:100%;margin:auto;padding:clamp(19px,4vw,44px);display:flex;flex-direction:column}
+#bo1z-menu .bm-top{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #ffffff2a;padding-bottom:20px}
+#bo1z-menu .bm-brand{font-weight:900;font-size:clamp(23px,3vw,34px);line-height:1;letter-spacing:.05em;color:#e8e5de}
+#bo1z-menu .bm-brand small{display:block;margin-top:8px;color:#b99866;font-size:11px;letter-spacing:.36em;font-weight:800}
+#bo1z-menu .bm-subbrand{font-size:10px;font-weight:800;color:#b7aea1;text-transform:uppercase;letter-spacing:.22em;text-align:right}
+#bo1z-menu .bm-nav{display:flex;gap:8px;flex-wrap:wrap;margin:28px 0}
+#bo1z-menu button,#bo1z-menu select{font:inherit}
+#bo1z-menu .bm-tab{appearance:none;border:1px solid #ffffff28;background:transparent;color:#a6a5a2;border-radius:4px;min-height:43px;padding:0 21px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;cursor:pointer}
+#bo1z-menu .bm-tab[aria-selected="true"]{color:#161616;background:#c7a477;border-color:#c7a477}
+#bo1z-menu .bm-view[hidden]{display:none}
+#bo1z-menu h1{margin:0;font-size:clamp(38px,6vw,74px);line-height:.98;letter-spacing:-.065em;font-weight:900;text-transform:uppercase}
+#bo1z-menu .bm-kicker{display:block;color:#c7a477;text-transform:uppercase;letter-spacing:.28em;font-size:11px;font-weight:900;margin-bottom:13px}
+#bo1z-menu .bm-lede{color:#a9a9a7;line-height:1.6;max-width:60ch;margin:18px 0 25px;font-size:14px}
+#bo1z-menu .bm-maps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-top:10px}
+#bo1z-menu .bm-map{border:1px solid #444443;min-height:175px;position:relative;overflow:hidden;border-radius:5px;text-align:left;padding:23px;background:linear-gradient(155deg,#272524,#141414);color:#f5efe5;display:flex;flex-direction:column;justify-content:flex-end;cursor:pointer}
+#bo1z-menu .bm-map:not(:disabled):hover{border-color:#ddc196}
+#bo1z-menu .bm-map[aria-pressed="true"]{border:2px solid #d3a46c;background:radial-gradient(circle at 75% 20%,#68563c 0%,transparent 60%),linear-gradient(140deg,#292722,#0c0d0e)}
+#bo1z-menu .bm-map:disabled{opacity:.42;cursor:not-allowed}
+#bo1z-menu .bm-map-number{position:absolute;top:12px;left:18px;font-size:11px;letter-spacing:.2em;color:#bea17d;font-weight:800}
+#bo1z-menu .bm-map-name{font-size:clamp(18px,2vw,27px);line-height:1.1;font-weight:850;text-transform:uppercase;letter-spacing:-.045em}
+#bo1z-menu .bm-map-tag{font-size:10px;letter-spacing:.16em;color:#b6b0a6;margin-top:9px;text-transform:uppercase;font-weight:750}
+#bo1z-menu .bm-toolbar{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;border-top:1px solid #ffffff25;margin-top:25px;padding-top:20px}
+#bo1z-menu .bm-caption{color:#aaa49a;font-size:12px;line-height:1.55;max-width:56ch}
+#bo1z-menu .bm-caption strong{color:#e9e6e0}
+#bo1z-menu .bm-play{appearance:none;border:0;min-height:54px;min-width:230px;padding:14px 30px;border-radius:4px;background:#d3a46c;color:#16130f;font-weight:950;font-size:13px;letter-spacing:.11em;text-transform:uppercase;cursor:pointer;transition:background .15s}
+#bo1z-menu .bm-play:disabled{background:#57524b;color:#a09b94;cursor:default}
+#bo1z-menu .bm-play:not(:disabled):hover{background:#f0c28b}
+#bo1z-menu .bm-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:28px 0;max-width:740px}
+#bo1z-menu .bm-field{border:1px solid #ffffff20;background:#17191b;padding:17px;display:flex;flex-direction:column;gap:12px;border-radius:4px}
+#bo1z-menu .bm-field label{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#cfc8bd;font-weight:800}
+#bo1z-menu .bm-field select{width:100%;padding:11px 13px;border:1px solid #807566;background:#101112;color:white;border-radius:3px;min-height:43px}
+#bo1z-menu .bm-notice{font-size:12px;color:#a8a29b;line-height:1.6;max-width:78ch}
+#bo1z-menu .bm-loading{width:min(650px,100%);margin:auto;display:flex;flex-direction:column;align-items:flex-start}
+#bo1z-menu .bm-spinner{width:31px;height:31px;border:3px solid #6e6559;border-top-color:#e7bb82;border-radius:50%;animation:bm-spin 1s linear infinite;margin-bottom:27px}
+#bo1z-menu .bm-load-title{font-size:clamp(30px,5vw,54px);line-height:1;text-transform:uppercase;font-weight:900;letter-spacing:-.055em;margin:0 0 20px}
+#bo1z-menu .bm-load-state{font-size:14px;line-height:1.6;color:#dfd5c8;overflow-wrap:anywhere;min-height:48px;max-width:650px}
+#bo1z-menu .bm-load-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+#bo1z-menu .bm-small-btn{border:1px solid #d3a46c;background:transparent;color:#d6bd97;padding:12px 18px;border-radius:3px;cursor:pointer;font-size:12px;font-weight:800}
+#bo1z-menu .bm-foot{margin-top:auto;padding-top:24px;font-size:10px;color:#706e6b;letter-spacing:.1em;text-transform:uppercase}
+@keyframes bm-spin{to{transform:rotate(360deg)}}
+@media(max-width:680px){
+ #bo1z-menu .bm-inner{padding:22px 18px 32px}
+ #bo1z-menu .bm-top{padding-bottom:14px}
+ #bo1z-menu .bm-nav{margin:20px 0}
+ #bo1z-menu .bm-maps{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #bo1z-menu .bm-map{min-height:128px;padding:15px}
+ #bo1z-menu .bm-map-name{font-size:18px}
+ #bo1z-menu .bm-map-tag{font-size:9px}
+ #bo1z-menu .bm-settings{grid-template-columns:1fr}
+ #bo1z-menu .bm-play{width:100%}
+}
+@media(max-width:410px){#bo1z-menu .bm-maps{grid-template-columns:1fr}#bo1z-menu .bm-map{min-height:96px}}
+@media(prefers-reduced-motion:reduce){#bo1z-menu .bm-spinner{animation:none}}
