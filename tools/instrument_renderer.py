@@ -73,6 +73,26 @@ DB_SYNC = [
      '    DB_PostLoadXZone();')
 ]
 
+# The post-gfx queue is followed by DB_SyncXAssets → Sys_SyncDatabase.
+# Surface a single heartbeat every 5 seconds if the cooperative DB fiber never
+# sets databaseCompletedEvent. This is observation only: no fake completion,
+# no unsafe sleeps inside an active Asyncify fiber, no shortened wait.
+DB_WAIT = [
+    ('    while ( !Sys_WaitForSingleObjectTimeout(&databaseCompletedEvent, 1u) )',
+     '    KB_WebBootPhase("DB wait: entering Sys_SyncDatabase");\n'
+     '    unsigned int kbLastProgress = Sys_Milliseconds();\n'
+     '    while ( !Sys_WaitForSingleObjectTimeout(&databaseCompletedEvent, 1u) )'),
+    ('        SocketRouter_EmergencyFrame();\n    }\n}',
+     '        SocketRouter_EmergencyFrame();\n'
+     '        if (static_cast<unsigned int>(Sys_Milliseconds() - kbLastProgress) >= 5000u)\n'
+     '        {\n'
+     '            kbLastProgress = Sys_Milliseconds();\n'
+     '            KB_WebBootPhase("DB wait: still waiting for databaseCompletedEvent");\n'
+     '        }\n'
+     '    }\n'
+     '    KB_WebBootPhase("DB wait: databaseCompletedEvent signaled");\n}')
+]
+
 def patch_function(text: str, signature: str, changes: list):
     if text.count(signature) != 1:
         raise RuntimeError(f'Expected unique function signature: {signature!r}')
@@ -101,23 +121,25 @@ def patch_file(path: Path, specs: list):
 def run(root: Path):
     gfx = root / 'src/gfx_d3d/r_init.cpp'
     db = root / 'src/database/db_registry.cpp'
-    for path in (gfx, db):
+    threads = root / 'src/qcommon/threads.cpp'
+    for path in (gfx, db, threads):
         if not path.is_file():
             raise RuntimeError(f'Engine source missing: {path}')
     # Restore both files on failure so no partially patched source is compiled.
-    originals = {p:p.read_bytes() for p in (gfx, db)}
+    originals = {p:p.read_bytes() for p in (gfx, db, threads)}
     try:
         patch_file(gfx, [('char __cdecl R_InitHardware(const GfxWindowParms *wndParms)', R_INIT),
                          ('HRESULT __cdecl R_CreateDeviceInternal(HWND__ *hwnd, unsigned int behavior, _D3DPRESENT_PARAMETERS_ *d3dpp)', DEVICE)])
         patch_file(db, [('void __cdecl DB_LoadGraphicsAssetsForPC()', DB_GRAPHICS),
                         ('void __cdecl DB_SyncXAssets()', DB_SYNC)])
+        patch_file(threads, [('void __cdecl Sys_SyncDatabase()', DB_WAIT)])
     except Exception:
         for path, original in originals.items():
             path.write_bytes(original)
         raise
 
 def self_test():
-    for name, group in [('renderer',R_INIT),('device',DEVICE),('database',DB_GRAPHICS),('sync',DB_SYNC)]:
+    for name, group in [('renderer',R_INIT),('device',DEVICE),('database',DB_GRAPHICS),('sync',DB_SYNC),('database-wait',DB_WAIT)]:
         sample='\n'.join(old for old, _ in group)
         for old, new in group:
             if sample.count(old) != 1:
