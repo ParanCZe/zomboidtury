@@ -17,6 +17,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Verify browser code, engine and game manifest
+        run: |
+          node --test tests/*.test.cjs
+          python3 -m py_compile tools/prepare_kino.py
       - name: Restore verified game data
         uses: actions/cache@v4
         with:
