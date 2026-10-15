@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - mobile-port.patch.gz
+      - tools/fix_bootstrap.py
       - tools/instrument_boot.py
       - tools/instrument_renderer.py
       - .github/workflows/engine-build.yml
@@ -29,6 +30,7 @@ jobs:
           gzip -dc mobile-port.patch.gz > engine.patch
           git -C engine-source apply --check ../engine.patch
           git -C engine-source apply ../engine.patch
+          python3 tools/fix_bootstrap.py engine-source
           python3 tools/instrument_boot.py --self-test
           python3 tools/instrument_boot.py engine-source
           python3 tools/instrument_renderer.py --self-test
