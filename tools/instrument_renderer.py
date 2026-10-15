@@ -80,13 +80,13 @@ DB_SYNC = [
 DB_WAIT = [
     ('    while ( !Sys_WaitForSingleObjectTimeout(&databaseCompletedEvent, 1u) )',
      '    KB_WebBootPhase("DB wait: entering Sys_SyncDatabase");\n'
-     '    unsigned int kbLastProgress = Sys_Milliseconds();\n'
+     '    auto kbLastProgress = std::chrono::steady_clock::now();\n'
      '    while ( !Sys_WaitForSingleObjectTimeout(&databaseCompletedEvent, 1u) )'),
     ('        SocketRouter_EmergencyFrame();\n    }\n}',
      '        SocketRouter_EmergencyFrame();\n'
-     '        if (static_cast<unsigned int>(Sys_Milliseconds() - kbLastProgress) >= 5000u)\n'
+     '        if (std::chrono::steady_clock::now() - kbLastProgress >= std::chrono::seconds(5))\n'
      '        {\n'
-     '            kbLastProgress = Sys_Milliseconds();\n'
+     '            kbLastProgress = std::chrono::steady_clock::now();\n'
      '            KB_WebBootPhase("DB wait: still waiting for databaseCompletedEvent");\n'
      '        }\n'
      '    }\n'
@@ -112,7 +112,7 @@ def patch_file(path: Path, specs: list):
     original = path.read_text(encoding='utf-8')
     if 'boot_trace_web.h' in original:
         raise RuntimeError(f'Already instrumented: {path}')
-    updated = '#include <qcommon/boot_trace_web.h>\n' + original
+    updated = '#include <qcommon/boot_trace_web.h>\n' + (('#include <chrono>\n' + original) if path.name == 'threads.cpp' else original)
     for signature, changes in specs:
         updated = patch_function(updated, signature, changes)
     path.write_text(updated, encoding='utf-8')
