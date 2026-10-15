@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const vm = require('node:vm');
 
 test('all browser scripts and inline launch scripts parse', () => {
-  for (const filename of ['blackops.js','engine-loader.js','kino-pack.js','sha256-stream.js','mobile-keys.js','mobile-ui.js','web_fs.js','coi-serviceworker.js']) {
+  for (const filename of ['blackops.js','engine-loader.js','kino-pack.js','sha256-stream.js','mobile-keys.js','mobile-ui.js','bo1z-menu.js','web_fs.js','coi-serviceworker.js']) {
     assert.doesNotThrow(() => new vm.Script(fs.readFileSync(filename, 'utf8'), {filename}));
   }
   const html = fs.readFileSync('index.html', 'utf8');
@@ -18,7 +18,7 @@ test('all browser scripts and inline launch scripts parse', () => {
     assert.doesNotThrow(() => new vm.Script(match[1], {filename: 'index.html inline #' + inline}));
   }
   assert.ok(inline >= 5, 'Expected launch scripts in index.html');
-  for (const name of ['blackops.js','web_fs.js','sha256-stream.js','kino-pack.js','engine-loader.js','mobile-keys.js','mobile-ui.js','mobile.css','coi-serviceworker.js'])
+  for (const name of ['blackops.js','web_fs.js','sha256-stream.js','kino-pack.js','engine-loader.js','mobile-keys.js','mobile-ui.js','mobile.css','bo1z-menu.js','bo1z-menu.css','coi-serviceworker.js'])
     assert.ok(fs.existsSync(name), 'Missing browser dependency: ' + name);
 });
 
@@ -111,4 +111,21 @@ test('loader retries a partial network failure, then loads the complete Wasm onl
   await context.window.KBZLoadEngine();
   assert.equal(appended,1,'Never initialize the runtime twice');
   assert.equal(requests.filter(name => name === 'blackops.wasm.001').length,2);
+});
+
+test('BO1Z menu opens before download and offers only installed maps', () => {
+  const html = fs.readFileSync('index.html','utf8');
+  const menu = fs.readFileSync('bo1z-menu.js','utf8');
+  assert.match(html, /class="menu-open"/, 'First paint must be the menu, not a game download');
+  assert.match(html, /id="bo1z-menu"/);
+  assert.match(html, /id="bm-start"/);
+  assert.match(html, /data-map="zombie_theater"/);
+  assert.match(html, /data-map="zombie_pentagon"[^>]*disabled/);
+  assert.match(html, /data-map="zombie_cosmodrome"[^>]*disabled/);
+  assert.ok(html.indexOf('id="bo1z-menu"') < html.indexOf('id="kberr"'), 'Menu should render before the engine');
+  assert.match(html, /src="bo1z-menu.js\?v=/);
+  assert.match(menu, /pick\.click\(\)/, 'Only the Start button can enter the existing engine loader');
+  assert.doesNotMatch(menu, /\bfetch\s*\(/, 'Menu must never fetch game data just by opening the page');
+  assert.match(menu, /searchParams\.set\('rmode'/, 'Video settings must be passed to preRun');
+  assert.match(menu, /searchParams\.set\('fps'/, 'FPS must be passed to preRun');
 });
