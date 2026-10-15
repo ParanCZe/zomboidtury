@@ -486,6 +486,32 @@
       if (document.documentElement.classList.contains("mobile")) Module._KBMobile_Enable?.(1);
       KBZBootLog.phase('runtime připraven, čekám na vykreslení stránky');
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      // FS_Startup opens many IWD zip archives. Print aggregate progress, not
+      // every tiny read: Safari otherwise spends more time logging than loading.
+      const fsBridge = Module.KBFS;
+      let prevFsProgress = -1, unchangedIntervals = 0, lastLogTime = 0;
+      if (fsBridge?.snapshot) {
+        window.__KBFSWatchTimer = setInterval(() => {
+          const d = fsBridge.snapshot();
+          const progress = d.opens + d.readCalls + d.cachedReads + d.dirListings;
+          if (progress === prevFsProgress) unchangedIntervals++;
+          else unchangedIntervals = 0;
+          prevFsProgress = progress;
+          const now = Date.now();
+          if (now-lastLogTime >= 7000) {
+            lastLogTime=now;
+            KBZBootLog('FS PRŮBĚH: '+d.openedArchives+' archivů, '+
+              d.dirListings+' výpisů adresářů, '+d.readCalls+
+              ' asynchronních čtení, '+d.cachedReads+' čtení z cache; POSLEDNÍ '+
+              d.lastOp+' '+d.lastPath+(d.lastError ? '; CHYBA '+d.lastError : ''));
+          }
+          if (unchangedIntervals >= 5 && d.openedArchives === 0) {
+            // Not a conclusive crash: a synchronous engine loop may still run.
+            document.getElementById('status').textContent =
+              'FS_Startup zatím neotevřel žádný IWD. Poslední krok: '+d.lastOp+' '+d.lastPath;
+          }
+        }, 3000);
+      }
       KBZBootLog.phase('vstup do callMain / Com_Init (pokud zde log končí, main thread nevrací řízení)');
       setStatus("Engine: inicializace Kino…");
       // Save the checkpoint before the engine enters a possibly synchronous loop.
