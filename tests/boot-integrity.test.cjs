@@ -73,6 +73,12 @@ test('KBFS resolves Windows paths and cached OPFS Blob byte ranges', async () =>
   assert.deepEqual(Array.from(await bridge.pread(id, 1, 3)), [5,6,7]);
   assert.deepEqual(Array.from(bridge.preadCached(id, 2, 3)), [6,7,8]);
   assert.deepEqual(Array.from(bridge.listDir('main','iwd',null,false)), ['iw_00.iwd']);
+  const diag = bridge.snapshot();
+  assert.equal(diag.openedArchives,1);
+  assert.equal(diag.readCalls,1);
+  assert.equal(diag.cachedReads,1);
+  assert.ok(diag.dirListings >= 1);
+  assert.match(diag.lastOp, /listDir/);
   bridge.close(id);
   assert.equal(await bridge.size(id), -1);
 });
