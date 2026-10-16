@@ -3,7 +3,7 @@
   "emscripten": "3.1.69",
   "wasmBytes": 18579373,
   "wasmSha256": "7080cfa39725660efecc21a312a81a90d46fdcf02f72128af412e09611a27dd0",
-  "commit": "37de6c0af99d51a9b974d2772864e65c8f3eb851",
+  "commit": "c071365a60f6d0a7e13bd7139023c202f64c0ef5",
   "instrumentedBoot": true,
   "gameplayVerified": false
 }
