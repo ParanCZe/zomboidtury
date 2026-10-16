@@ -76,15 +76,28 @@
     // engine loading and execution in that order.
     pick.click();
   }
-  function exposeEngine() {
+  function exposeEngine(showDiagnostics = true) {
     host.hidden = true;
     html.classList.remove('menu-open','game-loading');
-    document.getElementById('boot-diagnostics').open = true;
+    document.getElementById('boot-diagnostics').open = showDiagnostics;
     if (window.KBZBootLog && window.KBZBootLog.flush) window.KBZBootLog.flush();
   }
   document.getElementById('bm-start').addEventListener('click',launch);
-  document.getElementById('bm-show').addEventListener('click',exposeEngine);
+  document.getElementById('bm-show').addEventListener('click',() => exposeEngine());
   document.getElementById('bm-cancel').addEventListener('click',() => location.reload());
+
+  // Emscripten invokes this when the engine's frame loop starts. Do not leave
+  // the full-screen download panel covering the canvas and touch controls.
+  if (window.Module) {
+    const previous = window.Module.postMainLoop;
+    let revealed = false;
+    window.Module.postMainLoop = () => {
+      if (previous) previous();
+      if (!launching || revealed) return;
+      revealed = true;
+      exposeEngine(false);
+    };
+  }
 
   if (typeof MutationObserver !== 'undefined') {
     const observer = new MutationObserver(() => {

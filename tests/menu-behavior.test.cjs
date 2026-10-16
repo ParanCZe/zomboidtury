@@ -22,6 +22,7 @@ test('map selection is shown without downloads; Kino Start applies settings and 
         home=node('bm-home'), loading=node('bm-loading'),
         progress=node('bm-progress'),start=node('bm-start');
   node('bm-back');node('bm-show');node('bm-cancel');
+  const diagnostics=node('boot-diagnostics');diagnostics.open=false;
   let downloads=0;pick.click=()=>downloads++;
   loading.hidden=true;
   const choices={
@@ -64,7 +65,7 @@ test('map selection is shown without downloads; Kino Start applies settings and 
     history:{state:null,replaceState:(_state,_title,url)=>{updatedUrl=url;}},
     localStorage:{getItem:()=>null,setItem:()=>{}},
     URL,
-    window:{},
+    window:{Module:{}},
     MutationObserver:class{observe(){}}
   };
   vm.createContext(context);
@@ -74,6 +75,9 @@ test('map selection is shown without downloads; Kino Start applies settings and 
   assert.equal(home.hidden,false);
   assert.equal(loading.hidden,true);
   assert.equal(start.disabled,false);
+  assert.equal(typeof context.window.Module.postMainLoop,'function');
+  context.window.Module.postMainLoop();
+  assert.equal(menu.hidden,false,'A frame callback before Start must not dismiss the menu');
   const fps=nodes.get('bm-fps');
   fps.value='45';fps.listeners.change();
   const audio=nodes.get('bm-audio');
@@ -89,4 +93,9 @@ test('map selection is shown without downloads; Kino Start applies settings and 
   assert.match(updatedUrl,/rmode=960x540/);
   start.click();
   assert.equal(downloads,1,'Second click must not start engine again');
+  assert.equal(menu.hidden,false,'Downloading must keep the progress visible');
+  context.window.Module.postMainLoop();
+  assert.equal(menu.hidden,true,'The engine loop must reveal the game automatically');
+  assert.equal(classes.has('game-loading'),false);
+  assert.equal(diagnostics.open,false,'Diagnostics must not cover the game by default');
 });
