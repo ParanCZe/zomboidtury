@@ -8,6 +8,8 @@ on:
       - tools/fix_bootstrap.py
       - tools/fix_fiber_tls.py
       - tools/fix_cooperative_wait.py
+      - tools/fix_volume_caps.py
+      - tests/volume-caps.test.py
       - tests/cooperative-wait.test.py
       - tools/fix_archive_scan.py
       - tests/archive-scan.test.py
@@ -38,6 +40,7 @@ jobs:
           python3 tools/fix_bootstrap.py engine-source
           python3 tools/fix_fiber_tls.py engine-source
           python3 tools/fix_cooperative_wait.py engine-source
+          python3 tools/fix_volume_caps.py engine-source
           python3 tools/instrument_boot.py --self-test
           python3 tools/instrument_boot.py engine-source
           python3 tools/fix_archive_scan.py engine-source
