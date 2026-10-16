@@ -67,7 +67,7 @@ jobs:
       - name: Compile unthreaded Asyncify engine
         shell: bash
         run: |
-          emcmake cmake -S engine-source -B engine-build -DCMAKE_BUILD_TYPE=Release -DKISAK_WEB_THREADS=OFF -DKISAK_WEB_ASSERTIONS=ON
+          emcmake cmake -S engine-source -B engine-build -DCMAKE_BUILD_TYPE=Release -DKISAK_WEB_THREADS=OFF -DKISAK_WEB_ASSERTIONS=ON -DCMAKE_EXE_LINKER_FLAGS=-sUSE_OFFSET_CONVERTER=1
           cmake --build engine-build --parallel 4
       - name: Validate compiled Wasm and package current player
         shell: bash

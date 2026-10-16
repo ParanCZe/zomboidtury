@@ -4,6 +4,7 @@ const {chromium} = require('playwright');
 const fs = require('node:fs');
 fs.mkdirSync('gameplay-report', {recursive:true});
 const log = fs.createWriteStream('gameplay-report/browser.log');
+let fatalError = false;
 const record = text => { log.write(text+'\n'); console.log(text); };
 (async () => {
   const browser = await chromium.launch({headless:true,args:[
@@ -13,9 +14,9 @@ const record = text => { log.write(text+'\n'); console.log(text); };
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   await cdp.send('Profiler.enable');
-  page.on('console', m => record(m.type()+': '+m.text()));
-  page.on('pageerror', e => record('PAGE ERROR: '+e.stack));
-  page.on('crash', () => record('PAGE CRASH'));
+  page.on('console', m => {if (/Sys_Error|Aborted\(/.test(m.text())) fatalError=true;record(m.type()+': '+m.text());});
+  page.on('pageerror', e => {fatalError=true;record('PAGE ERROR: '+e.stack);});
+  page.on('crash', () => {fatalError=true;record('PAGE CRASH');});
   await page.goto('http://127.0.0.1:8765/?mobile=1');
   await page.evaluate(() => {
     const phase=window.KBZBootLog.phase;
@@ -53,6 +54,7 @@ const record = text => { log.write(text+'\n'); console.log(text); };
     await page.evaluate(()=>window.BO1ZMenu.exposeEngine());
     await page.screenshot({path:'gameplay-report/engine.png',timeout:10000});
     await page.locator('#canvas').screenshot({path:'gameplay-report/canvas-before.png',timeout:10000});
+    if (fatalError) throw new Error('Engine failed; screenshots captured, input test cannot establish gameplay');
     await page.evaluate(()=>Module._KBMobile_Key(119,1));
     await new Promise(resolve=>setTimeout(resolve,1500));
     await page.evaluate(()=>{Module._KBMobile_Key(119,0);Module._KBMobile_Look(80,0);Module._KBMobile_Key(-1,1);});
